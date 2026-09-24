@@ -90,6 +90,26 @@ def _safe_update_state(task, stage: str, meta_extra: dict | None = None) -> None
         logger.exception("Progress update failed for stage=%r — continuing", stage)
 
 
+def _start_heartbeat(task, experiment_id: str):
+    """Mulai tanda hidup untuk run ini, atau None.
+
+    Hanya tugas yang benar-benar dikirim lewat broker yang mendapatnya: tugas
+    seperti itu selalu punya id dan tidak eager. Mode eager dan panggilan
+    langsung ``.run()`` (keduanya dipakai test) tidak punya Redis untuk
+    ditulisi. Tidak pernah melempar: tanpa tanda hidup, run tetap berjalan.
+    """
+    try:
+        request = getattr(task, "request", None)
+        if not getattr(request, "id", None) or getattr(request, "is_eager", False):
+            return None
+        from workers.heartbeat import Heartbeat, redis_sink
+        return Heartbeat(experiment_id, redis_sink(CELERY_RESULT_BACKEND)).start()
+    except Exception:
+        logger.warning("Tanda hidup untuk %s tidak dapat dimulai", experiment_id,
+                       exc_info=True)
+        return None
+
+
 @app.task(
     bind=True,
     name='workers.run_pipeline_task',
@@ -131,6 +151,10 @@ def run_pipeline_task(self, experiment_id: str, dataset_type: str,
         self.update_state(state="PROGRESS", meta={"stage": "Menyiapkan eksekusi…"})
     except Exception:
         logger.exception("[DIAG] worker-entered update_state failed")
+    # Tanda hidup (workers/heartbeat): pengamatan murni atas proses ini, supaya
+    # UI dan penyapu stale dapat membedakan tahap berat yang sehat dari worker
+    # yang mati. Dihentikan di blok `finally` di bawah, apa pun jalan keluarnya.
+    _heartbeat = _start_heartbeat(self, experiment_id)
     try:
         # Idempotency guard: skip if already completed (handles Celery acks_late redelivery)
         exp = get_experiment(experiment_id)
@@ -321,3 +345,7 @@ def run_pipeline_task(self, experiment_id: str, dataset_type: str,
         except Exception:
             logger.exception("set_failed itself raised during error handling for %s", experiment_id)
         raise
+
+    finally:
+        if _heartbeat is not None:
+            _heartbeat.stop()

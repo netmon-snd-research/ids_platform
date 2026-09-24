@@ -68,10 +68,9 @@ _EXT_MAP: dict[str, tuple[str, ...]] = {
 # terlalu besar melewati diagnosa dengan mulus — diagnosa hanya mencuplik
 # 50.000 baris — lalu worker di-OOM-kill. Karena `--pool=solo`, SIGKILL
 # membunuh satu-satunya proses dan tidak ada yang menulis status gagal:
-# eksperimennya tertinggal `RUNNING` sampai `cleanup_stale_experiments`
-# menandainya "Likely caused by worker crash" 120 menit kemudian. Pesan itu
-# menyalahkan tempat yang salah, dan sebabnya sudah dapat diketahui SEBELUM
-# tombol Run ditekan — dari ukuran berkasnya saja.
+# eksperimennya tertinggal `RUNNING`, dan baru ketahuan lewat tanda hidup
+# worker yang berhenti (ui/components/liveness.py). Padahal sebabnya sudah
+# dapat diketahui SEBELUM tombol Run ditekan — dari ukuran berkasnya saja.
 #
 #: Pengali RAM terhadap ukuran berkas CSV. DIUKUR pada dataset penelitian ini
 #: (ALLFLOWMETER_HIKARI2021.csv, 288,4 MB → 555.278 × 88):
@@ -3247,6 +3246,12 @@ def _poll_experiment(experiment_id: str):
             else:
                 st.error(r["message"])
             st.rerun()
+
+        # Popup tanda hidup: TAMBAHAN di atas tampilan pemuatan di atas, yang
+        # tidak diubah. Tidak menggambar apa pun kecuali run diam atau
+        # workernya berhenti (ui/components/liveness.py).
+        from ui.components.liveness import maybe_show_liveness_popup
+        maybe_show_liveness_popup(status_data)
 
         # [DIAG] Diagnostic block — visible on every poll tick. Removable
         # in one grep pass (search for "[DIAG]"). No expander, no collapse.

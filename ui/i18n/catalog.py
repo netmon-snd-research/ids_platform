@@ -438,6 +438,58 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.msg_exp_was_cancelled": {"id": "Eksperimen telah dibatalkan.",
                                  "en": "Experiment was cancelled."},
     "re.msg_exp_failed": {"id": "Eksperimen gagal:", "en": "Experiment failed:"},
+    # Popup tanda hidup (ui/components/liveness.py): tambahan di atas tampilan
+    # pemuatan, muncul hanya bila run diam atau workernya berhenti.
+    "re.live_dialog_title": {"id": "Pemantauan run", "en": "Run monitor"},
+    "re.live_quiet_title": {"id": "Proses tampak diam",
+                            "en": "The process looks idle"},
+    "re.live_quiet_body": {
+        "id": "Worker masih hidup, tetapi tidak memakai CPU selama {minutes} "
+              "menit. Tahap yang menunggu disk bisa begini; bila berlanjut, "
+              "batalkan run lalu periksa log worker.",
+        "en": "The worker is still alive, but it has not used the CPU for "
+              "{minutes} minutes. A stage waiting on disk can look like this; "
+              "if it continues, cancel the run and check the worker log."},
+    "re.live_ram_now": {"id": "RAM saat ini {ram}.", "en": "RAM in use: {ram}."},
+    "re.live_silent_title": {"id": "Worker berhenti", "en": "The worker stopped"},
+    "re.live_silent_since": {"id": "Tidak ada tanda hidup sejak {ago} lalu.",
+                             "en": "No sign of life for {ago}."},
+    "re.live_silent_body": {
+        "id": "Prosesnya kemungkinan dihentikan, misalnya kehabisan memori, "
+              "atau container worker dimulai ulang. Run ini tidak akan selesai.",
+        "en": "The process was most likely killed, for example by running out "
+              "of memory, or the worker container restarted. This run will not "
+              "finish."},
+    "re.live_silent_oom": {
+        "id": "Pemakaian RAM terakhirnya {ram} dari pagu {limit}, jadi prosesnya "
+              "hampir pasti dihentikan karena kehabisan memori. Menjalankan "
+              "ulang akan berhenti di titik yang sama: pakai dataset yang lebih "
+              "kecil, atau naikkan WORKER_MEM_LIMIT_MB di server.",
+        "en": "Its last RAM reading was {ram} of the {limit} cap, so the "
+              "process was almost certainly killed for running out of memory. "
+              "Running it again would stop at the same point: use a smaller "
+              "dataset, or raise WORKER_MEM_LIMIT_MB on the server."},
+    "re.live_running_for": {"id": "Berjalan {duration}.",
+                            "en": "Running for {duration}."},
+    "re.live_running_for_stage": {"id": "{stage} · berjalan {duration}.",
+                                  "en": "{stage} · running for {duration}."},
+    "re.live_stage": {"id": "Fase {index}/{total}: {name}",
+                      "en": "Phase {index}/{total}: {name}"},
+    "re.live_minutes": {"id": "{minutes} menit", "en": "{minutes} min"},
+    "re.live_hours": {"id": "{hours} jam {minutes} menit",
+                      "en": "{hours} h {minutes} min"},
+    "re.live_not_owner": {
+        "id": "Hanya pemilik run atau Research Admin yang dapat membatalkan "
+              "atau menjalankan ulang run ini.",
+        "en": "Only the run's owner or a Research Admin can cancel or rerun "
+              "this run."},
+    "re.live_wait_label": {"id": "Tunggu lagi selama", "en": "Wait for another"},
+    "re.live_btn_wait": {"id": "Tunggu", "en": "Wait"},
+    "re.live_btn_cancel": {"id": "Batalkan run", "en": "Cancel run"},
+    "re.live_btn_rerun": {"id": "Jalankan ulang", "en": "Run again"},
+    "re.live_btn_mark_failed": {"id": "Tandai gagal & tutup",
+                                "en": "Mark failed & close"},
+    "re.live_btn_close": {"id": "Tutup", "en": "Close"},
     "re.msg_log_later": {
         "id": "Log proses lengkap akan muncul di hasil setelah selesai.",
         "en": "The full process log will appear in the results once finished."},
@@ -534,14 +586,14 @@ CATALOG: dict[str, dict[str, str]] = {
         "id": "**`{filename}` terlalu besar untuk dijalankan di mesin ini.** "
               "Berkas {size}; jalur CSV memuatnya SEPENUHNYA ke RAM, "
               "diperkirakan ±{estimate}, sedangkan pagu worker {limit}. "
-              "Eksperimen akan mati di worker tanpa pesan dan baru ditandai "
-              "gagal 120 menit kemudian. Jalankan cuplikan yang lebih kecil, "
+              "Worker akan mati di tengah run karena kehabisan memori, dan run "
+              "itu tidak akan pernah selesai. Jalankan cuplikan yang lebih kecil, "
               "atau pakai dataset NDJSON yang diproses bertahap.",
         "en": "**`{filename}` is too large to run on this machine.** "
               "The file is {size}; the CSV path loads it ENTIRELY into RAM, "
               "estimated at ~{estimate}, while the worker cap is {limit}. "
-              "The experiment would die in the worker with no message and only "
-              "be marked failed 120 minutes later. Run a smaller sample, or "
+              "The worker would die mid-run from running out of memory, and "
+              "the run would never finish. Run a smaller sample, or "
               "use an NDJSON dataset, which is processed in chunks."},
     "re.msg_dataset_near_limit": {
         "id": "**`{filename}` mendekati pagu RAM worker.** Berkas {size}, "

@@ -10,7 +10,8 @@ import logging
 import uuid
 from pathlib import Path
 
-from config.celery_config import USE_ASYNC
+from config.celery_config import USE_ASYNC, CELERY_RESULT_BACKEND
+from workers.heartbeat import read_heartbeats, read_last_heartbeat
 
 logger = logging.getLogger(__name__)
 from orchestrator.validation_service import validate_for_experiment
@@ -487,11 +488,43 @@ def create_and_run_experiment(
         }
 
 
-def cleanup_stale_experiments(stale_threshold_minutes: int = 120) -> int:
-    """
-    Find experiments stuck in RUNNING or QUEUED for too long and mark them FAILED.
+def _parse_utc(value):
+    from datetime import datetime, timezone
+    try:
+        dt = datetime.fromisoformat(value or "")
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
-    Called at app startup to recover from worker crashes.
+
+def cleanup_stale_experiments(stale_threshold_minutes: int = 120, *,
+                              heartbeat_reader=None) -> int:
+    """
+    Find experiments left behind by a dead worker and mark them FAILED.
+
+    Called at app startup (``ui/app.py``) to recover from worker crashes.
+
+    Mode sinkron: pipeline berjalan di proses UI itu sendiri, jadi catatan
+    RUNNING/QUEUED yang lebih tua dari ``stale_threshold_minutes`` saat UI
+    menyala pasti yatim. Aturan umur itu tetap dipakai.
+
+    Mode async: umur TIDAK dipakai untuk RUNNING. Run yang workernya masih
+    mengirim tanda hidup (``workers.heartbeat``) tidak pernah disentuh, berapa
+    pun lamanya; sebelumnya setiap run berumur >120 menit digagalkan saat UI
+    dimulai ulang dan hasilnya kemudian ditolak penjaga idempotensi.
+
+    * RUNNING ditandai FAILED hanya bila tanda hidupnya TIDAK ada dan run itu
+      sudah berjalan >= ``HEARTBEAT_STALE_MINUTES``.
+    * QUEUED ditandai FAILED hanya bila lebih tua dari
+      ``stale_threshold_minutes`` DAN tidak ada run RUNNING yang hidup.
+      Antrean di belakang run yang hidup sedang menunggu giliran, bukan macet.
+    * Bila tanda hidup tidak dapat dinilai (Redis tak terjangkau atau baru
+      menyala), tidak ada yang ditandai: tidak tahu bukan berarti mati.
+
+    ``heartbeat_reader(ids) -> {id: payload | None} | None`` dapat disuntik;
+    bawaannya membaca Redis result backend.
 
     Returns:
         Number of experiments cleaned up.
@@ -499,19 +532,17 @@ def cleanup_stale_experiments(stale_threshold_minutes: int = 120) -> int:
     from database.db import list_experiments_by_status
     from database.models import STATUS_RUNNING, STATUS_QUEUED
     from datetime import datetime, timezone, timedelta
+    from workers.heartbeat import HEARTBEAT_STALE_MINUTES
 
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(minutes=stale_threshold_minutes)
     count = 0
-    threshold = datetime.now(timezone.utc) - timedelta(minutes=stale_threshold_minutes)
 
-    for status in [STATUS_RUNNING, STATUS_QUEUED]:
-        experiments = list_experiments_by_status(status)
-        for exp in experiments:
-            created = exp.get("created_at", "")
-            try:
-                created_dt = datetime.fromisoformat(created)
-                if created_dt.tzinfo is None:
-                    created_dt = created_dt.replace(tzinfo=timezone.utc)
-                if created_dt < threshold:
+    if not USE_ASYNC:
+        for status in [STATUS_RUNNING, STATUS_QUEUED]:
+            for exp in list_experiments_by_status(status):
+                created_dt = _parse_utc(exp.get("created_at", ""))
+                if created_dt is not None and created_dt < threshold:
                     set_failed(
                         exp["id"],
                         completed_at=now_iso(),
@@ -521,8 +552,60 @@ def cleanup_stale_experiments(stale_threshold_minutes: int = 120) -> int:
                         ),
                     )
                     count += 1
-            except (ValueError, TypeError):
-                continue
+        return count
+
+    running = list_experiments_by_status(STATUS_RUNNING)
+    queued = list_experiments_by_status(STATUS_QUEUED)
+    if not running and not queued:
+        return 0
+
+    if heartbeat_reader is None:
+        from config.celery_config import CELERY_RESULT_BACKEND
+
+        def heartbeat_reader(ids):
+            return read_heartbeats(ids, CELERY_RESULT_BACKEND)
+
+    beats = heartbeat_reader([exp["id"] for exp in running])
+    if beats is None:
+        logger.warning(
+            "Tanda hidup worker tidak dapat dinilai; %s run RUNNING dan %s "
+            "QUEUED dibiarkan apa adanya.", len(running), len(queued))
+        return 0
+
+    silent_after = now - timedelta(minutes=HEARTBEAT_STALE_MINUTES)
+    any_alive = False
+    for exp in running:
+        if beats.get(exp["id"]):
+            any_alive = True
+            continue
+        since = _parse_utc(exp.get("started_at") or exp.get("created_at") or "")
+        if since is None or since >= silent_after:
+            continue
+        set_failed(
+            exp["id"],
+            completed_at=now_iso(),
+            error_message=(
+                "Experiment stale: the worker stopped sending heartbeats for "
+                f"over {HEARTBEAT_STALE_MINUTES} minutes. The process was most "
+                "likely killed (e.g. out of memory) or the worker restarted."
+            ),
+        )
+        count += 1
+
+    if not any_alive:
+        for exp in queued:
+            created_dt = _parse_utc(exp.get("created_at", ""))
+            if created_dt is not None and created_dt < threshold:
+                set_failed(
+                    exp["id"],
+                    completed_at=now_iso(),
+                    error_message=(
+                        f"Experiment stale: waited in the queue for over "
+                        f"{stale_threshold_minutes} minutes while no run was "
+                        "active. The worker is most likely not running."
+                    ),
+                )
+                count += 1
 
     return count
 
@@ -567,6 +650,16 @@ def get_experiment_status(experiment_id: str) -> dict | None:
                 experiment_id,
                 exc_info=True,
             )
+
+        # Tanda hidup worker (workers/heartbeat). `heartbeat_known` False berarti
+        # tidak dapat dinilai, BUKAN mati. Bila kunci hidupnya tidak ada, salinan
+        # terakhirnya ikut dibaca supaya UI dapat menebak sebab worker berhenti.
+        beats = read_heartbeats([experiment_id], CELERY_RESULT_BACKEND)
+        exp["heartbeat_known"] = beats is not None
+        exp["heartbeat"] = (beats or {}).get(experiment_id)
+        if beats is not None and exp["heartbeat"] is None:
+            exp["heartbeat_last"] = read_last_heartbeat(
+                experiment_id, CELERY_RESULT_BACKEND)
 
     return exp
 
