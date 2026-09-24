@@ -75,8 +75,10 @@ Heredoc-nya **dikutip** (`<<'EOF'`): tanpa kutip itu, sandi yang mengandung
 Anda ketik.
 
 **Ini yang paling sering menjatuhkan orang.** Server baru berarti basis data
-kosong. Tanpa `ADMIN_PASSWORD`, **tidak ada admin yang dibuat sama sekali**,
-dan tidak ada jalan masuk. Tidak ada sandi bawaan: itu disengaja.
+kosong. Tanpa `.env`, yang lahir adalah admin bawaan `Ai` / `12345678` yang
+tertulis di `docker-compose.yml` — Anda tetap bisa masuk, tetapi begitu pula
+siapa pun yang pernah membaca repo ini. Di server, **selalu timpa keduanya**
+lewat `.env` seperti di atas.
 
 `REQUIRE_LOGIN_TO_RUN=true` menutup jalur "siapa pun boleh menjalankan". Di
 laptop hal itu tidak berbahaya karena tidak ada yang dapat menjangkaunya; di
@@ -123,21 +125,50 @@ Periksa tidak ada yang tersarang:
 ls storage/uploaded_pipelines/     # TIDAK boleh ada "uploaded_pipelines" di sini
 ```
 
-### 8. Sesuaikan pagu memori — DUA tempat, harus sama
+### 8. Sesuaikan pagu memori: SATU baris di `.env`
 
-Di `docker-compose.yml`:
+Bawaannya 3500 MB, yaitu pagu mesin pengembangan (Docker Desktop di WSL2 hanya
+memberi VM-nya sekitar 3,53 GB). Di server Linux tidak ada VM itu, jadi angka
+tersebut hanya memotong worker tanpa sebab dan membuat UI menolak dataset yang
+sebenarnya muat.
 
-| Tempat | Service | Sekarang |
-|---|---|---|
-| `mem_limit:` | `worker` | `3500m` |
-| `WORKER_MEM_LIMIT_MB` | `ui` | `3500` |
+Setel satu variabel di `.env`:
 
-Server dengan RAM lebih besar: naikkan **keduanya** ke angka yang sama.
+```bash
+WORKER_MEM_LIMIT_MB=13000
+```
 
-Menaikkan `WORKER_MEM_LIMIT_MB` saja membuat UI mengizinkan dataset yang pasti
-membunuh worker: gagal diam-diam di tengah run. Menaikkan `mem_limit` saja
-hanya membuat UI terlalu kaku, yang aman tetapi menjengkelkan. Sisakan RAM
-untuk sistem; jangan berikan seluruhnya.
+Satu baris itu mengatur KEDUANYA: `mem_limit` container worker dan pagu yang
+dipercaya UI saat mengunci tombol Run (`dataset_ram_blocker`). Keduanya membaca
+variabel yang sama di `docker-compose.yml`, jadi tidak ada lagi dua tempat yang
+dapat menyimpang. Tanpa `.env`, keduanya tetap 3500.
+
+Berlaku setelah `docker compose up -d`. Periksa keduanya benar-benar terpasang:
+
+```bash
+docker compose config | grep -E "mem_limit|WORKER_MEM_LIMIT_MB"
+docker inspect ids_worker --format '{{.HostConfig.Memory}}'   # nilai x 1048576
+docker exec ids_ui printenv WORKER_MEM_LIMIT_MB
+```
+
+**Memilih angkanya.** Lihat RAM total server:
+
+```bash
+free -h
+```
+
+Ambil kolom `total`, sisakan sekitar 2 GB untuk sistem operasi, container UI,
+dan Redis, lalu bulatkan ke bawah. Contoh: server 16 GB melaporkan sekitar
+15 GB total, dikurangi 2 GB menjadi sekitar 13 GB, jadi `WORKER_MEM_LIMIT_MB=13000`.
+
+Jangan berikan seluruh RAM. Tidak ada mode "tanpa batas" di platform ini, dan
+itu disengaja: worker tanpa `mem_limit` yang kehabisan memori tidak mati
+sendirian, ia menyeret seluruh server.
+
+Menaikkan pagu TIDAK mengubah hasil pipeline mana pun. Batas baris internal
+pipeline EVE (`modeling_train_rows`, `n_jobs`) dan `PARAM_BOUNDS` adalah angka
+tersendiri yang tidak ikut naik. Yang berubah hanya dataset mana yang diizinkan
+UI, dan seberapa jauh worker boleh memakai RAM sebelum dibunuh.
 
 ### 9. Build sebagai non-root
 

@@ -176,16 +176,25 @@ memasangnya di tempat yang dapat dijangkau orang lain, kerjakan daftar ini.
 
 ### 1. Admin pertama (WAJIB)
 
-Tidak ada password bawaan. Buat `.env` di sebelah `docker-compose.yml`:
+⚠️ **Repositori ini memuat admin bawaan: `Ai` / `12345678`**, tertulis di
+`docker-compose.yml`. `docker compose up` tanpa `.env` akan membuatnya, dan
+sandi itu terbaca siapa pun yang dapat membaca repo ini. Bawaan tersebut
+ditujukan untuk jaringan lab tertutup saja.
+
+**Timpa sebelum memasangnya di tempat yang dapat dijangkau orang lain.** Buat
+`.env` di sebelah `docker-compose.yml`:
 
 ```
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<sandi kuat, minimal 8 karakter>
 ```
 
-Bila `ADMIN_PASSWORD` kosong, **tidak ada admin yang dibuat** dan halaman
-login mengatakan apa yang harus disetel. Itu disengaja: default lemah yang
-tertulis di repositori lebih buruk daripada tidak ada admin sama sekali.
+Password minimal 8 karakter; bila lebih pendek, admin **tidak dibuat** dan
+aplikasi hanya mencatat peringatan di log.
+
+Seeding **tidak pernah menimpa akun yang sudah ada**. Bila `Ai` terlanjur
+lahir dengan sandi bawaan, menyunting `.env` tidak mengubahnya — masuk sebagai
+`Ai` lalu pakai **Ganti sandi**, atau hapus akunnya lewat Kelola Pengguna.
 
 ### 2. Cadangan (WAJIB)
 
@@ -221,8 +230,8 @@ lewat HTTP. Untuk domain publik, sunting `docker/proxy/Caddyfile`: ganti
 ### 4. Menutup akses jalankan
 
 Bawaannya siapa pun boleh menjalankan eksperimen. Di internet terbuka itu
-berarti antrean dapat dipenuhi orang asing (worker berpagu 3,5 GB,
-concurrency 1):
+berarti antrean dapat dipenuhi orang asing (satu worker, concurrency 1, dengan
+pagu RAM bawaan 3,5 GB):
 
 ```
 REQUIRE_LOGIN_TO_RUN=true
@@ -271,8 +280,11 @@ menekan sepuluh kali.
   autentikasi). Untuk menengoknya: `docker compose exec redis redis-cli ping`.
 * Tidak ada batas laju maupun kuota per pengguna. Pada jaringan terbuka,
   gabungkan langkah 3 dan 4.
-* Pagu memori 3,5 GB adalah batas nyata: dataset besar ditolak di muka oleh
-  `dataset_ram_blocker`, bukan dibiarkan gagal di tengah jalan.
+* Pagu memori worker adalah batas nyata: dataset besar ditolak di muka oleh
+  `dataset_ram_blocker`, bukan dibiarkan gagal di tengah jalan. Bawaannya
+  3500 MB (mesin pengembangan); server menyetelnya lewat satu variabel
+  `WORKER_MEM_LIMIT_MB` di `.env`, yang mengatur pagu worker dan pagu UI
+  sekaligus. Lihat [docs/MIGRASI.md](docs/MIGRASI.md) langkah 8.
 
 ## Prerequisites
 
@@ -400,13 +412,16 @@ button is never the only thing standing in the way.
 
 ### First Research Admin
 
-The first Research Admin is created at startup from environment variables. No
-password is ever hardcoded:
+The first Research Admin is created at startup from environment variables.
 
-| Variable | Default | Notes |
-|---|---|---|
-| `ADMIN_USERNAME` | `admin` | Optional |
-| `ADMIN_PASSWORD` | *(none)* | Required to create the account, min. 8 characters |
+⚠️ **This repository ships a default admin: `Ai` / `12345678`**, written into
+`docker-compose.yml`. Anyone who can read this repo knows it. It exists for
+closed lab installs; override it via `.env` anywhere else.
+
+| Variable | Default (Docker) | Default (local venv) | Notes |
+|---|---|---|---|
+| `ADMIN_USERNAME` | `Ai` | `admin` | Compose sets `Ai`; the Python fallback is `admin` |
+| `ADMIN_PASSWORD` | `12345678` | *(none)* | Min. 8 characters, or no account is created |
 
 ```powershell
 # Docker: put these in a .env file beside docker-compose.yml (do not commit it)
@@ -418,10 +433,12 @@ $env:ADMIN_PASSWORD = "<strong password>"
 streamlit run ui/app.py
 ```
 
-If `ADMIN_PASSWORD` is not set, **no account is created** — the app logs a
-warning and the login page tells you to set it. A weak default account is never
-created. Seeding is idempotent: an existing admin is never overwritten, so
-changing `ADMIN_PASSWORD` later does **not** reset the password.
+Outside Docker, if `ADMIN_PASSWORD` is not set, **no account is created** — the
+app logs a warning and the login page tells you to set it. Under Docker the
+compose default always supplies one, so that path does not trigger.
+
+Seeding is idempotent: an existing admin is never overwritten, so changing
+`ADMIN_PASSWORD` later does **not** reset the password.
 
 ### Logging in
 
@@ -770,7 +787,7 @@ This is an honest list. The platform is intentionally scoped.
 - **Classical ML only.** No deep learning (LSTM, Transformer, GNN). The contracts and storage layer could be extended, but no DL pipeline currently exists.
 - **Pre-extracted inputs required.** HIKARI2021 is a pre-extracted feature CSV; EVE-cbr ingests raw Suricata **EVE NDJSON/JSONL logs** and does its own feature engineering across the 14 phases. There is no pcap-to-feature extraction stage in this repo.
 - **EVE-cbr focuses on TLS traffic** and derives its `Target` label from Suricata alerts (not external ground truth); metrics are reported on the natural holdout. Other app protocols are split out but the registered pipelines process the TLS split.
-- **EVE memory profile.** The cbr adapter caps sampling/training rows (e.g. `modeling_train_rows=150000`) so a large EVE log stays within the worker's `mem_limit` (3500m); the cbr core default of 10M rows would OOM.
+- **EVE memory profile.** The cbr adapter caps sampling/training rows (e.g. `modeling_train_rows=150000`) so a large EVE log stays within the worker's `mem_limit`, whose default is 3500m; the cbr core default of 10M rows would OOM. That default is not a hard ceiling: a server raises both the worker cap and the UI's guard by setting `WORKER_MEM_LIMIT_MB` in `.env` (see [docs/MIGRASI.md](docs/MIGRASI.md) step 8). The adapter's own row caps are separate numbers and do not move with it, so raising the cap changes no pipeline result.
 - **Dataset files must be placed manually** in `storage/datasets/`. There is no file upload widget in the UI; this is a deliberate choice to keep dataset provenance traceable.
 - **No CI/CD.** Tests are run locally; there is no GitHub Actions / Jenkins / etc. pipeline configured at the time of writing.
 - **SQLite, not PostgreSQL.** Sufficient for a single-user research workload but not horizontally scalable.

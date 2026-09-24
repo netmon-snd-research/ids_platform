@@ -57,8 +57,18 @@ services:
       --loglevel=info
       --pool=solo
       --concurrency=1
-    # RAM cap for the cbr EVE pipeline (validated resource budget ~3.53 GB).
-    mem_limit: 3500m
+    # Pagu RAM worker. 3500 MB adalah BAWAAN untuk mesin pengembangan: Docker
+    # Desktop di WSL2 hanya memberi VM-nya sekitar 3,53 GB, dan angka itulah
+    # yang dipakai saat pipeline cbr EVE diukur. Ia bukan batas mati platform.
+    #
+    # Server dengan RAM lebih besar menyetel WORKER_MEM_LIMIT_MB di `.env`
+    # (lihat docs/MIGRASI.md langkah 8). Satu baris di sana mengubah pagu ini
+    # DAN pagu yang dibaca UI di bawah, sebab keduanya membaca variabel yang
+    # sama. Tanpa `.env`, keduanya tetap 3500 persis seperti sebelumnya.
+    #
+    # Tidak ada mode "tanpa batas": worker tanpa mem_limit yang kehabisan
+    # memori tidak mati sendirian, ia menyeret seluruh server.
+    mem_limit: ${WORKER_MEM_LIMIT_MB:-3500}m
     volumes:
       - ./storage:/app/storage          # shared storage with UI
     depends_on:
@@ -110,13 +120,24 @@ services:
       # `shutil.rmtree(work_root)` di blok `finally` adapter-nya.
       - TMPDIR=/app/storage/tmp
       # Admin pertama (dipakai UI saat start; worker ikut membacanya agar
-      # environment kedua service konsisten). TIDAK ada password bawaan:
-      # `pass1234` dahulu tertulis di sini sebagai default, sehingga siapa pun
-      # yang menjalankan `docker compose up` tanpa `.env` mendapat admin
-      # bersandi yang tertulis di repositori.
+      # environment kedua service konsisten).
+      #
+      # ⚠️ ADA PASSWORD BAWAAN, DAN IA TERTULIS DI REPOSITORI INI. Siapa pun
+      # yang menjalankan `docker compose up` tanpa `.env` mendapat Research
+      # Admin `Ai` bersandi `12345678` — dan siapa pun yang dapat membaca repo
+      # ini tahu sandinya. Ini keputusan yang disengaja untuk pemasangan lab
+      # tertutup, bukan kelalaian.
+      #
+      # TIMPA di `.env` sebelum pemasangan yang dapat dijangkau orang lain:
+      #   ADMIN_USERNAME=<nama lain>
+      #   ADMIN_PASSWORD=<password kuat>
+      # Seed TIDAK PERNAH menimpa akun yang sudah ada: bila `Ai` sudah lahir
+      # dengan sandi bawaan, mengganti `.env` tidak mengubahnya — ganti lewat
+      # "Ganti sandi" di aplikasi.
+      #
       # Password minimal 8 karakter — bila lebih pendek, admin TIDAK dibuat.
       - ADMIN_USERNAME=${ADMIN_USERNAME:-Ai}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-12345678}
       # Menutup jalur "siapa pun boleh menjalankan eksperimen". Bawaan kosong
       # = terbuka, persis seperti sebelumnya.
       #
@@ -172,15 +193,24 @@ services:
       # yang pasti tidak muat (lihat `dataset_ram_blocker`). Nilainya WAJIB
       # sama dengan `mem_limit` service worker di atas; ditulis di sini supaya
       # UI tidak menyimpan salinan kedua yang dapat menyimpang diam-diam.
-      - WORKER_MEM_LIMIT_MB=3500
+      #
+      # Variabel dan bawaannya sengaja ditulis sama persis dengan `mem_limit`
+      # itu: menyetel WORKER_MEM_LIMIT_MB di `.env` menaikkan keduanya
+      # sekaligus, jadi pagu worker dan pagu yang dipercaya UI tidak dapat
+      # menyimpang. Test test_dataset_ram_guard.py menjaga kesamaan ini.
+      - WORKER_MEM_LIMIT_MB=${WORKER_MEM_LIMIT_MB:-3500}
       # Admin pertama dibuat oleh service ini saat start, dari environment.
-      # Setel di berkas .env (jangan di repo):
+      #
+      # ⚠️ BAWAANNYA `Ai` / `12345678`, TERTULIS DI REPOSITORI INI. Lihat
+      # keterangan panjang pada service `worker` di atas — nilainya sengaja
+      # dibuat SAMA di kedua service supaya tidak ada salinan kedua yang
+      # menyimpang diam-diam.
+      #
+      # Timpa di `.env` (berkas itu diabaikan git) untuk pemasangan nyata:
       #   ADMIN_USERNAME=admin
       #   ADMIN_PASSWORD=<password kuat, minimal 8 karakter>
-      # Bila ADMIN_PASSWORD kosong, TIDAK ada admin yang dibuat (aplikasi
-      # menampilkan petunjuk di halaman login) — tidak ada password bawaan.
       - ADMIN_USERNAME=${ADMIN_USERNAME:-Ai}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-12345678}
       # Menutup jalur "siapa pun boleh menjalankan eksperimen". Bawaan kosong
       # = terbuka, persis seperti sebelumnya.
       #
