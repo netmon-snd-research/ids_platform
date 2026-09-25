@@ -3919,6 +3919,8 @@ CATALOG: dict[str, dict[str, str]] = {
     # mengubah keadaan.
     "ap.zone_examined": {"id": "Yang diperiksa", "en": "What was checked"},
     "ap.zone_testing": {"id": "Pengujian", "en": "Testing"},
+    "ap.contract_dropdown": {"id": "Kontrak dataset dari pengaju",
+                             "en": "Dataset contract from the submitter"},
     # Judul zona Pengujian menyebut paket MANA yang diuji. Lihat
     # `contribute._testing_title`: hasil uji putaran lama terbaca seolah-olah
     # berlaku bagi putaran baru kalau nomornya tidak ikut tertulis.

@@ -1355,6 +1355,65 @@ def _render_fact_rows(pairs, *, columns: int = 2) -> None:
     detail_facts(pairs, columns=columns)
 
 
+def _join_names(value) -> str:
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v).strip() for v in value if str(v).strip())
+    return str(value or "").strip()
+
+
+def contract_rows(item: dict) -> list[tuple[str, str]]:
+    """Kontrak dataset yang diisi pengaju, SELENGKAPNYA, sebagai pasangan
+    label-nilai dengan label yang sama persis dengan formulir unggahnya.
+
+    Sebelumnya peninjau hanya melihat kolom label dan JUMLAH kolom wajib (di
+    bagian Keputusan); format berkas, arti label, sifat fitur, jumlah kelas,
+    dan nama kolomnya baru terlihat SESUDAH disetujui, di katalog. Padahal
+    itulah yang ia perlukan untuk memilih dataset uji coba yang cocok.
+
+    Nilai yang kosong ikut dikembalikan; penggambarnya yang membuangnya.
+    """
+    meta = item.get("metadata") or {}
+    declared = meta.get("declared_schema")
+    if not isinstance(declared, dict):
+        declared = {}
+    classes = meta.get("dataset_class_count")
+
+    def _text(value) -> str:
+        return str(value or "").strip()
+
+    by_key = (
+        ("ap.lbl_label_column", _text(declared.get("label_column"))),
+        ("ap.lbl_file_format", _text(declared.get("file_format")).upper()),
+        ("ap.lbl_required_columns", _join_names(declared.get("expected_columns"))),
+        ("ap.lbl_row_unit", _text(meta.get("dataset_row_unit"))),
+        ("ap.lbl_label_meaning", _text(meta.get("dataset_label_meaning"))),
+        ("ap.lbl_feature_nature", _text(meta.get("dataset_feature_nature"))),
+        ("ap.lbl_class_count",
+         "" if classes in (None, "", 0, "0") else str(classes)),
+        ("ap.lbl_sample_values", _text(meta.get("dataset_sample_values"))),
+        ("ap.lbl_ignored_columns", _join_names(meta.get("dataset_ignored_columns"))),
+    )
+    return [(t(key), value) for key, value in by_key]
+
+
+def _render_contract_dropdown(item: dict) -> None:
+    """Kontrak dataset pengaju sebagai SATU dropdown di bagian Pengujian.
+
+    Popover, BUKAN expander: halaman ini sengaja tanpa expander supaya temuan
+    tidak pernah tersembunyi di balik klik. Kontrak bukan temuan melainkan
+    rujukan saat memilih dataset uji coba, jadi ia boleh terlipat, dan
+    popover melipatnya tanpa melanggar aturan itu. Isinya memakai baris fakta
+    berlatar yang sama dengan "Yang diperiksa". Tidak digambar sama sekali
+    bila pengaju tidak mengisi apa pun (mis. pengajuan yang menumpang
+    research bawaan).
+    """
+    rows = [(k, v) for k, v in contract_rows(item) if v]
+    if not rows:
+        return
+    with st.popover(t("ap.contract_dropdown"), width="stretch"):
+        _render_fact_rows(rows)
+
+
 def _render_file_table(item: dict, files: list[dict]) -> None:
     """Daftar berkas paket sebagai TABEL, lalu SATU berkas dibaca di bawahnya.
 
@@ -2134,6 +2193,7 @@ def _render_submission_review_card(item: dict, user: dict,
         # putaran 3 yang baru saja diunggah.
         rp.zone_heading(rp.ZONE_TEST, t("ap.zone_testing"),
                         help=_trial_help(item))
+        _render_contract_dropdown(item)
         _render_trial_step(item, user, latest)
 
     with st.container(border=True):
