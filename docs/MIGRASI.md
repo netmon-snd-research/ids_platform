@@ -58,6 +58,38 @@ aslinya.
 
 Docker Engine + plugin Compose. **[BELUM DIUJI]** pada distribusi tertentu.
 
+**Bila server memakai CPU Arm** (mis. NVIDIA DGX Spark / ASUS Ascent GX10
+dengan GB10 Grace Blackwell, yang ber-CPU Arm 20-core), tidak ada langkah
+tambahan di sini, tetapi ada tiga hal yang harus Anda sadari.
+
+Pertama, **image WAJIB dibangun di server**, bukan dipindahkan dari laptop
+x86. Image yang dibangun di Windows atau Linux x86 tidak akan berjalan di
+mesin Arm. Runbook ini memang sudah membangun di server (`docker compose up -d
+--build`), jadi tidak ada yang berubah, tetapi jangan tergoda memakai
+`docker save` dari laptop sebagai jalan pintas.
+
+Kedua, `python:3.11-slim` punya varian arm64 dan sebagian besar paket di
+`requirements.txt` menyediakan wheel aarch64, jadi build biasanya lancar. Bila
+ada paket yang tidak punya wheel, pip akan membangunnya dari source; kedua
+Dockerfile sudah memasang `build-essential`. Kalau build tersendat pada scipy
+atau scikit-learn, tambahkan `gfortran` dan `libopenblas-dev` ke baris
+`apt-get install` di `docker/Dockerfile` dan `docker/worker.Dockerfile`, lalu
+build ulang.
+
+Ketiga, dan ini yang paling penting untuk laporan penelitian: **pindah
+arsitektur CPU dapat menggeser digit terakhir hasil pipeline.** Lihat
+verifikasi F di bawah, dan kerjakan sebelum angka apa pun dari server dipakai.
+
+Catatan khusus mesin dengan memori terpadu (DGX Spark memakai 128 GB LPDDR5X
+yang dipakai BERSAMA oleh CPU dan GPU): apa pun yang dimakan worker berkurang
+dari jatah GPU. Pagu di langkah 8 karena itu bukan sekadar rem keamanan, ia
+juga yang menjaga GPU tetap punya ruang. Tetap pakai 32000.
+
+GPU-nya sendiri tidak dipakai platform ini. Seluruh pipeline terdaftar berjalan
+di CPU lewat scikit-learn, dan XGBoost pun dikonfigurasi tanpa CUDA.
+Mengalihkannya ke GPU akan mengubah angka yang dikutip laporan, jadi itu
+keputusan tersendiri, bukan bagian dari migrasi.
+
 ### 6. Klon repositori, lalu buat `.env` SEBELUM start pertama
 
 ```bash
@@ -291,6 +323,52 @@ python scripts/backup.py --out /var/backups/ids
 ```
 
 Jalankan **sekali secara manual** sebelum mengandalkan cron.
+
+### F. Hasil pipeline tidak bergeser
+
+WAJIB bila arsitektur CPU server berbeda dari mesin tempat angka laporan
+dihasilkan, misalnya pindah dari x86_64 ke Arm. Pustaka BLAS yang berbeda
+menjumlahkan bilangan pecahan dalam urutan yang berbeda, dan itu cukup untuk
+menggeser digit terakhir.
+
+Jalankan pipeline sebagai panggilan murni di dalam container worker, tanpa
+menulis ke basis data maupun artefak:
+
+```bash
+docker compose exec worker python -c "
+import pandas as pd
+from contracts.pipeline_contracts import PipelineInput
+from pipelines.hikari2021.dt_pipeline import HikariDTPipeline
+df = pd.read_csv('/app/storage/datasets/ALLFLOWMETER_HIKARI2021.csv')
+h = HikariDTPipeline().run(PipelineInput(df=df, label_column='Label',
+                                         dataset_type='HIKARI2021', random_state=42))
+print('accuracy', repr(h.accuracy))
+print('f1      ', repr(h.f1_score))
+print('cm      ', h.confusion_matrix)
+print('roc_auc ', repr(h.extra_info['roc_auc']))"
+```
+
+Nilai acuan untuk HIKARI2021 Decision Tree:
+
+```
+accuracy 0.8844787014359122
+f1       0.8821483953824806
+cm       [[146123, 9152], [10092, 1217]]
+roc_auc  0.5638879269120521
+```
+
+Decision Tree adalah kasus yang paling mungkin tetap identik, sebab ia
+membandingkan ambang batas dan tidak bersandar pada BLAS. Yang lebih rawan
+adalah SVC, Logistic Regression, KNN, dan XGBoost, yang perkalian matriksnya
+memang lewat BLAS. Jadi jangan berhenti di DT: jalankan juga pipeline lain yang
+angkanya Anda kutip, dan bandingkan dengan catatan langkah 2.
+
+Bila ada yang berbeda, sekecil apa pun, JANGAN diperbaiki diam-diam dan jangan
+dibulatkan. Catat angka lama dan angka baru berikut nama mesin dan
+arsitekturnya, lalu putuskan secara sadar: melaporkan angka server, atau tetap
+memakai angka mesin lama dan menyebut server hanya sebagai tempat pemasangan.
+Yang tidak boleh adalah laporan mengklaim satu angka sementara mesin yang
+berjalan menghasilkan angka lain.
 
 ---
 
