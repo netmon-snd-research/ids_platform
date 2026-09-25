@@ -110,11 +110,18 @@ def _start_heartbeat(task, experiment_id: str):
         return None
 
 
+# TANPA batas waktu, dengan sengaja. Dahulu 3600 detik (lunak) dan 3900 detik
+# (keras): setiap run di atas satu jam dihentikan, berapa pun RAM dan inti
+# server, padahal run panjang adalah hal wajar pada dataset besar. Keputusan
+# pemilik platform: run yang sehat tidak pernah dihentikan karena lamanya.
+# Run yang benar-benar macet atau workernya mati ditangani tanda hidup
+# (workers/heartbeat) dan popup di halaman pemantauan, yang membiarkan pemilik
+# run atau Research Admin membatalkannya. Uji coba pipeline kontribusi TETAP
+# berbatas waktu (orchestrator/trial_service.TRIAL_LIMITS): itu kode yang
+# belum ditinjau, bukan eksperimen.
 @app.task(
     bind=True,
     name='workers.run_pipeline_task',
-    soft_time_limit=3600,   # 1 hour soft limit — raises SoftTimeLimitExceeded
-    time_limit=3900,        # 1 hour 5 min hard kill
     acks_late=True,
 )
 def run_pipeline_task(self, experiment_id: str, dataset_type: str,
@@ -322,9 +329,13 @@ def run_pipeline_task(self, experiment_id: str, dataset_type: str,
         return {"success": True, "experiment_id": experiment_id}
 
     except SoftTimeLimitExceeded:
+        # Tugas ini tidak lagi memasang batas waktu. Cabang ini tetap ada
+        # hanya untuk batas yang dipasang dari LUAR, misalnya
+        # `celery worker --soft-time-limit=...`, supaya run seperti itu tetap
+        # tercatat gagal dengan sebabnya, bukan tertinggal RUNNING.
         error_msg = (
-            "Pipeline execution timed out after 1 hour (soft_time_limit=3600s). "
-            "This typically happens with SVC on large datasets."
+            "Pipeline execution stopped by the worker's soft time limit "
+            "(set outside this task, e.g. celery --soft-time-limit)."
         )
         try:
             set_failed(experiment_id, completed_at=now_iso(), error_message=error_msg)

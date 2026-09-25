@@ -46,7 +46,8 @@ TRIAL_ROOT = Path("storage/trials")
 
 #: Batas uji coba — SENGAJA lebih ketat daripada eksperimen biasa.
 #:
-#: * ``max_seconds`` 300 detik vs 3600 detik pada eksperimen. Uji coba menjawab
+#: * ``max_seconds`` 300 detik, sedangkan eksperimen tidak berbatas waktu
+#:   (lihat catatan di atas `run_pipeline_task`). Uji coba menjawab
 #:   "apakah pipeline ini berjalan", bukan "berapa skor terbaiknya"; lima menit
 #:   cukup untuk menemukan kesalahan kontrak, impor, bentuk data, dan kolom
 #:   yang tidak ada — yang justru menjadi alasan fitur ini ada.
