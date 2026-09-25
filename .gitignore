@@ -22,7 +22,3 @@ storage/artifacts/*
 *.egg-info/
 dist/
 build/
-
-# Local dev tooling — kept on disk for local workflow, excluded from repo.
-CLAUDE.md
-.claude/
