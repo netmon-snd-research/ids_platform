@@ -75,7 +75,7 @@ Heredoc-nya **dikutip** (`<<'EOF'`): tanpa kutip itu, sandi yang mengandung
 Anda ketik.
 
 **Ini yang paling sering menjatuhkan orang.** Server baru berarti basis data
-kosong. Tanpa `.env`, yang lahir adalah admin bawaan `Ai` / `12345678` yang
+kosong. Tanpa `.env`, yang lahir adalah admin bawaan `LAB_UBI_UNHAS` / `sampingkulkas09` yang
 tertulis di `docker-compose.yml` — Anda tetap bisa masuk, tetapi begitu pula
 siapa pun yang pernah membaca repo ini. Di server, **selalu timpa keduanya**
 lewat `.env` seperti di atas.

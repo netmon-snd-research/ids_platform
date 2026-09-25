@@ -176,7 +176,7 @@ memasangnya di tempat yang dapat dijangkau orang lain, kerjakan daftar ini.
 
 ### 1. Admin pertama (WAJIB)
 
-⚠️ **Repositori ini memuat admin bawaan: `Ai` / `12345678`**, tertulis di
+⚠️ **Repositori ini memuat admin bawaan: `LAB_UBI_UNHAS` / `sampingkulkas09`**, tertulis di
 `docker-compose.yml`. `docker compose up` tanpa `.env` akan membuatnya, dan
 sandi itu terbaca siapa pun yang dapat membaca repo ini. Bawaan tersebut
 ditujukan untuk jaringan lab tertutup saja.
@@ -192,9 +192,9 @@ ADMIN_PASSWORD=<sandi kuat, minimal 8 karakter>
 Password minimal 8 karakter; bila lebih pendek, admin **tidak dibuat** dan
 aplikasi hanya mencatat peringatan di log.
 
-Seeding **tidak pernah menimpa akun yang sudah ada**. Bila `Ai` terlanjur
+Seeding **tidak pernah menimpa akun yang sudah ada**. Bila `LAB_UBI_UNHAS` terlanjur
 lahir dengan sandi bawaan, menyunting `.env` tidak mengubahnya — masuk sebagai
-`Ai` lalu pakai **Ganti sandi**, atau hapus akunnya lewat Kelola Pengguna.
+`LAB_UBI_UNHAS` lalu pakai **Ganti sandi**, atau hapus akunnya lewat Kelola Pengguna.
 
 ### 2. Cadangan (WAJIB)
 
@@ -414,14 +414,14 @@ button is never the only thing standing in the way.
 
 The first Research Admin is created at startup from environment variables.
 
-⚠️ **This repository ships a default admin: `Ai` / `12345678`**, written into
+⚠️ **This repository ships a default admin: `LAB_UBI_UNHAS` / `sampingkulkas09`**, written into
 `docker-compose.yml`. Anyone who can read this repo knows it. It exists for
 closed lab installs; override it via `.env` anywhere else.
 
 | Variable | Default (Docker) | Default (local venv) | Notes |
 |---|---|---|---|
-| `ADMIN_USERNAME` | `Ai` | `admin` | Compose sets `Ai`; the Python fallback is `admin` |
-| `ADMIN_PASSWORD` | `12345678` | *(none)* | Min. 8 characters, or no account is created |
+| `ADMIN_USERNAME` | `LAB_UBI_UNHAS` | `admin` | Compose sets `LAB_UBI_UNHAS`; the Python fallback is `admin` |
+| `ADMIN_PASSWORD` | `sampingkulkas09` | *(none)* | Min. 8 characters, or no account is created |
 
 ```powershell
 # Docker: put these in a .env file beside docker-compose.yml (do not commit it)

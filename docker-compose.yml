@@ -124,20 +124,20 @@ services:
       #
       # ⚠️ ADA PASSWORD BAWAAN, DAN IA TERTULIS DI REPOSITORI INI. Siapa pun
       # yang menjalankan `docker compose up` tanpa `.env` mendapat Research
-      # Admin `Ai` bersandi `12345678` — dan siapa pun yang dapat membaca repo
+      # Admin `LAB_UBI_UNHAS` bersandi `sampingkulkas09` — dan siapa pun yang dapat membaca repo
       # ini tahu sandinya. Ini keputusan yang disengaja untuk pemasangan lab
       # tertutup, bukan kelalaian.
       #
       # TIMPA di `.env` sebelum pemasangan yang dapat dijangkau orang lain:
       #   ADMIN_USERNAME=<nama lain>
       #   ADMIN_PASSWORD=<password kuat>
-      # Seed TIDAK PERNAH menimpa akun yang sudah ada: bila `Ai` sudah lahir
+      # Seed TIDAK PERNAH menimpa akun yang sudah ada: bila `LAB_UBI_UNHAS` sudah lahir
       # dengan sandi bawaan, mengganti `.env` tidak mengubahnya — ganti lewat
       # "Ganti sandi" di aplikasi.
       #
       # Password minimal 8 karakter — bila lebih pendek, admin TIDAK dibuat.
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-Ai}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-12345678}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-LAB_UBI_UNHAS}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-sampingkulkas09}
       # Menutup jalur "siapa pun boleh menjalankan eksperimen". Bawaan kosong
       # = terbuka, persis seperti sebelumnya.
       #
@@ -201,7 +201,7 @@ services:
       - WORKER_MEM_LIMIT_MB=${WORKER_MEM_LIMIT_MB:-3500}
       # Admin pertama dibuat oleh service ini saat start, dari environment.
       #
-      # ⚠️ BAWAANNYA `Ai` / `12345678`, TERTULIS DI REPOSITORI INI. Lihat
+      # ⚠️ BAWAANNYA `LAB_UBI_UNHAS` / `sampingkulkas09`, TERTULIS DI REPOSITORI INI. Lihat
       # keterangan panjang pada service `worker` di atas — nilainya sengaja
       # dibuat SAMA di kedua service supaya tidak ada salinan kedua yang
       # menyimpang diam-diam.
@@ -209,8 +209,8 @@ services:
       # Timpa di `.env` (berkas itu diabaikan git) untuk pemasangan nyata:
       #   ADMIN_USERNAME=admin
       #   ADMIN_PASSWORD=<password kuat, minimal 8 karakter>
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-Ai}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-12345678}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-LAB_UBI_UNHAS}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-sampingkulkas09}
       # Menutup jalur "siapa pun boleh menjalankan eksperimen". Bawaan kosong
       # = terbuka, persis seperti sebelumnya.
       #
