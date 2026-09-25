@@ -158,8 +158,37 @@ free -h
 ```
 
 Ambil kolom `total`, sisakan sekitar 2 GB untuk sistem operasi, container UI,
-dan Redis, lalu bulatkan ke bawah. Contoh: server 16 GB melaporkan sekitar
-15 GB total, dikurangi 2 GB menjadi sekitar 13 GB, jadi `WORKER_MEM_LIMIT_MB=13000`.
+dan Redis, bulatkan ke bawah, lalu ambil yang LEBIH KECIL antara hasil itu dan
+32000.
+
+| RAM server | `total` di `free -h` | Setel |
+|---|---|---|
+| 8 GB | ~7,7Gi | 5500 |
+| 16 GB | ~15Gi | 13000 |
+| 32 GB | ~31Gi | 29000 |
+| 64 GB | ~62Gi | 32000 |
+| 128 GB | ~125Gi | 32000 |
+
+Batas 32000 itu bukan kehati-hatian yang mengada-ada. Pagu ini dipakai dua hal
+sekaligus, dan pada server besar keduanya rusak bila pagunya ikut membesar:
+
+1. **Rem worker.** Gunanya membunuh proses yang lepas kendali SEBELUM ia
+   menyeret server. Pada server 128 GB dengan pagu 125000, proses yang lepas
+   kendali baru dibunuh setelah memakan 122 GB, dan pada titik itu sistem
+   operasinya sudah kehabisan napas lebih dulu.
+2. **Penjaga UI.** `dataset_ram_blocker` mengizinkan CSV sampai pagu dibagi
+   1,5. Pada pagu 125000 itu berarti CSV sampai 83 GB dianggap boleh
+   dijalankan, dan jalur CSV memuat berkas itu SEPENUHNYA ke RAM lewat
+   `pd.read_csv`. Penjaganya masih ada, tetapi tidak lagi menjaga apa pun.
+
+Bandingkan dengan kebutuhan yang sudah terukur di platform ini: HIKARI2021
+berukuran 288 MB menaksir 433 MB, dan pipeline EVE yang paling berat tercatat
+memuncak di 2,7 sampai 3,7 GB karena dibatasi `modeling_train_rows=150_000`.
+Tidak ada pipeline terdaftar yang mendekati 10 GB. Pagu 32000 sudah sekitar
+sembilan kali kebutuhan terberat yang pernah diukur.
+
+Bila suatu hari ada dataset yang tertolak padahal wajar, naikkan angkanya: satu
+baris `.env` ditambah `docker compose up -d`, tanpa menyunting compose.
 
 Jangan berikan seluruh RAM. Tidak ada mode "tanpa batas" di platform ini, dan
 itu disengaja: worker tanpa `mem_limit` yang kehabisan memori tidak mati
