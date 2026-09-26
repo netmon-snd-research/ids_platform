@@ -25,4 +25,4 @@ jobs:
             echo "Connected to VPS"
             /opt/ids-srv-scripts/deploy-ids.sh
 
-# Tes otentikasi vps->gtx
+# Tes otentikasi vps->gtx 
