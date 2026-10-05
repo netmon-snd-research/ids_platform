@@ -1697,6 +1697,22 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
        ada yang berjalan, dan itu keterangan — bukan hiasan. */
     .ids-run-dot {{ animation: none !important; }}
 }}
+
+/* ── Tanpa redup saat rerun ────────────────────────────────────────────
+   Bawaan Streamlit: rerun yang melewati 0,5 detik meredupkan SETIAP elemen
+   lama (opacity rendah, transisi 1 detik), lalu isi baru muncul mendadak.
+   Pada perpindahan halaman itu tampil sebagai layar yang berkedip. Elemen
+   lama dibiarkan utuh sampai isi baru menggantikannya; tanda bahwa aplikasi
+   sedang bekerja tetap ada di indikator "Running" di pojok kanan atas.
+   Ekspander dan tab membawa redupnya sendiri, jadi ikut dinetralkan. */
+[data-stale="true"],
+[data-stale="true"] details,
+[data-stale="true"] summary,
+[data-stale="true"] [role="tablist"],
+[data-stale="true"] [role="tab"] {{
+    opacity: 1 !important;
+    transition: none !important;
+}}
 </style>
 """
 

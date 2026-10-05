@@ -2111,6 +2111,8 @@ def _render_execution_status_panel(compact: bool = False) -> dict:
         top = st.columns([2, 1])
         top[0].markdown("**Status Eksekusi**")
         if top[1].button(t("re.btn_recheck"), key="recheck_health", use_container_width=True):
+            from orchestrator.health_service import forget_cached_health
+            forget_cached_health()
             st.session_state["_health_nonce"] = nonce + 1
             st.rerun()
 
@@ -3069,6 +3071,8 @@ def _render_execute():
                 # itu dicabut, dan menyuruh menekan tombol yang tidak ada
                 # adalah petunjuk yang tidak mungkin diikuti.
                 if st.button(t("re.btn_recheck"), key="recheck_health_inline"):
+                    from orchestrator.health_service import forget_cached_health
+                    forget_cached_health()
                     st.session_state["_health_nonce"] = (
                         st.session_state.get("_health_nonce", 0) + 1)
                     st.rerun()

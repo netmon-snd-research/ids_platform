@@ -13,11 +13,37 @@ This module does NOT change the USE_ASYNC value or the sync execution path; it
 only observes infrastructure so the UI can inform the user and guard submit.
 """
 import logging
+import threading
+import time
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_BROKER_TIMEOUT = 1.0   # seconds — keep short so the UI never hangs
 DEFAULT_WORKER_TIMEOUT = 1.5   # seconds — control.ping round-trip
+
+#: Umur maksimum hasil pemeriksaan yang dipakai ulang, dalam detik.
+#:
+#: Satu hasil dipakai BERSAMA oleh sidebar, Progress & Status, dan Run
+#: Experiment. Dahulu ketiganya punya cache sendiri-sendiri (4, 5, dan 10
+#: detik), sehingga hampir setiap perpindahan halaman memicu probe baru — dan
+#: probe worker yang tidak dijawab memakan seluruh `DEFAULT_WORKER_TIMEOUT`.
+#: Rerun yang melewati 0,5 detik membuat Streamlit meredupkan seluruh halaman,
+#: jadi jeda itu tampil sebagai layar berkedip setiap kali berpindah halaman.
+SHARED_CACHE_SECONDS = 10.0
+
+_cache_lock = threading.Lock()
+_cache: tuple[float, dict] | None = None
+
+
+def forget_cached_health() -> None:
+    """Buang hasil bersama, supaya pemeriksaan berikutnya memprobe ulang.
+
+    Dipanggil tombol "Periksa ulang": pengguna yang menekannya meminta keadaan
+    SEKARANG, bukan hasil yang masih berumur beberapa detik.
+    """
+    global _cache
+    with _cache_lock:
+        _cache = None
 
 
 def _probe_broker(broker_url: str, timeout: float):
@@ -49,7 +75,12 @@ def _probe_workers(timeout: float):
     (ok: bool, count: int, message: str). Never raises."""
     try:
         from workers.celery_worker import app as celery_app
-        pong = celery_app.control.ping(timeout=timeout) or []
+        # `limit=1`: berhenti menunggu begitu SATU worker menjawab. Tanpanya
+        # broadcast selalu menunggu `timeout` penuh untuk mengumpulkan jawaban
+        # dari worker lain yang mungkin ada — 1,5 detik di setiap pemeriksaan,
+        # padahal platform ini menjalankan satu worker. Akibatnya `count`
+        # paling banyak 1: artinya "ada worker yang hidup", bukan jumlah total.
+        pong = celery_app.control.ping(timeout=timeout, limit=1) or []
         count = len(pong)
         if count > 0:
             return True, count, ""
@@ -78,7 +109,23 @@ def check_execution_health(
     In sync mode broker/worker are not required, so ``can_run`` is True and no
     probing happens. In async mode ``can_run`` is True only when both the broker
     and at least one worker are reachable. Never raises.
+
+    Hasil dipakai ulang selama ``SHARED_CACHE_SECONDS`` oleh SEMUA pemanggil
+    (lihat :func:`forget_cached_health` untuk memaksa probe baru). Salinan yang
+    dikembalikan, jadi pemanggil bebas mengubahnya.
     """
+    global _cache
+    with _cache_lock:
+        if _cache is not None and time.monotonic() - _cache[0] < SHARED_CACHE_SECONDS:
+            return dict(_cache[1])
+        out = _check_execution_health(broker_timeout=broker_timeout,
+                                      worker_timeout=worker_timeout)
+        _cache = (time.monotonic(), out)
+        return dict(out)
+
+
+def _check_execution_health(*, broker_timeout: float, worker_timeout: float) -> dict:
+    """Pemeriksaan sebenarnya, tanpa cache. Lihat :func:`check_execution_health`."""
     # Import at call time so tests can monkeypatch config.celery_config.USE_ASYNC.
     from config.celery_config import USE_ASYNC, CELERY_BROKER_URL
 
