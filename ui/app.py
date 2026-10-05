@@ -275,7 +275,7 @@ with _breadcrumb_slot:
 # dirender. Sebuah view tidak dapat mendeteksi kepergiannya sendiri (render()-nya
 # tidak dipanggil saat pengguna ada di halaman lain), jadi pemeriksaannya harus
 # berada di alur yang jalan pada setiap halaman — di sini.
-_page_changed = drop_stale_page_flags(page)
+drop_stale_page_flags(page)
 
 # Blok 2 dari sidebar: eksperimen yang sedang berjalan, di antara menu halaman
 # dan blok identitas. Memperbarui dirinya sendiri tiap 15 detik lewat
@@ -302,19 +302,25 @@ render_mode_switch()
 maybe_render_auth_dialog(page)
 
 # ── Page routing ──────────────────────────────────────────────────────────
-# SELURUH isi halaman digambar ke dalam SATU placeholder. Dua akibatnya:
+# SATU placeholder PER HALAMAN, di jalur elemen yang tetap. Halaman aktif
+# digambar ke slotnya sendiri; slot halaman lain tetap kosong.
 #
-# 1. saat halaman berganti, `.empty()` membuang seluruh subpohon halaman lama
-#    SEBELUM halaman baru menggambar — sebelumnya tiap view menulis langsung ke
-#    wadah utama, jadi tidak ada apa pun yang bisa dikosongkan dan sisa elemen
-#    halaman sebelumnya bertahan di layar;
-# 2. isi halaman selalu berada di jalur elemen yang sama, jadi frontend
-#    mengganti isinya alih-alih menyandingkan elemen lama dan baru.
-_page_slot = st.empty()
-if _page_changed:
-    _page_slot.empty()
+# Kenapa bukan satu placeholder bersama yang di-`.empty()` saat berpindah:
+# Streamlit menggabungkan delta yang antre untuk jalur yang SAMA, dan delta
+# "kosong" yang disusul `container()` dilebur menjadi `container()` saja.
+# Frontend lalu menerima blok baru di jalur yang sudah berisi blok sejenis dan
+# MEMPERTAHANKAN anak-anak lamanya. Sisa halaman sebelumnya baru dibuang saat
+# run selesai normal, padahal halaman yang memantau eksperimen tidak pernah
+# selesai normal (ia menunggu lalu `st.rerun()`): tombol "Batalkan
+# Eksperimen" milik Run Experiment tertinggal di bawah tabel Progress & Status.
+#
+# Dengan slot sendiri-sendiri, slot halaman lama menerima elemen kosong (isinya
+# terbuang seketika), dan slot halaman baru sebelumnya kosong sehingga tidak
+# ada anak lama yang dapat dipertahankan. Rerun di halaman yang sama tetap
+# memakai blok yang sama, jadi isinya tidak berkedip.
+_page_slots = {name: st.empty() for name in _PAGES}
 
-with _page_slot.container():
+with _page_slots[page].container():
     if page == "Progress & Status":
         from ui.views.view_results import render
         render()
