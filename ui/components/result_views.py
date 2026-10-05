@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from ui.components.sections import render_counts
 from ui.i18n import t
 
 # Reuse the tested confusion-matrix breakdown (positive class from label name,
@@ -103,63 +104,59 @@ def _render_interactive_cm(cm, label_mapping, eid: str) -> None:
         "fp": ("#fef3c7", "#92400e"), "fn": ("#fee2e2", "#991b1b"),
     }
 
+    from html import escape
+
     def _cell(count, title, key):
         bg, fg = palette[key]
-        st.markdown(
-            f"<div style='background:{bg}; color:{fg}; border:1px solid {fg}33; "
-            f"border-radius:8px; padding:10px; text-align:center;'>"
-            f"<div style='font-size:0.95rem; font-weight:600;'>{title}</div>"
-            f"<div style='font-size:1.5rem; font-weight:700; line-height:1.3;'>{count:,}</div>"
-            f"<div style='font-size:0.95rem; opacity:0.85;'>"
-            f"{t('ps.rv_of_total', pct=_pct(count))}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
+        return (
+            f"<div class='ids-cm-cell' style='background:{bg}; color:{fg}; "
+            f"border:1px solid {fg}33;'>"
+            f"<div class='ids-cm-title'>{escape(title)}</div>"
+            f"<div class='ids-cm-n'>{count:,}</div>"
+            f"<div class='ids-cm-pct'>"
+            f"{escape(t('ps.rv_of_total', pct=_pct(count)))}</div>"
+            f"</div>"
         )
 
-    hdr = st.columns([1.1, 1, 1])
-    _head = "text-align:center; font-size:0.95rem; font-weight:600;"
-    hdr[1].markdown(f"<div style='{_head}'>"
-                    f"{t('ps.rv_predicted', name=nn)}</div>",
-                    unsafe_allow_html=True)
-    hdr[2].markdown(f"<div style='{_head}'>"
-                    f"{t('ps.rv_predicted', name=an)}</div>",
-                    unsafe_allow_html=True)
-    r1 = st.columns([1.1, 1, 1])
-    _side = "font-size:0.95rem; font-weight:600; padding-top:24px;"
-    r1[0].markdown(f"<div style='{_side}'>{t('ps.rv_actual', name=nn)}</div>",
-                   unsafe_allow_html=True)
-    with r1[1]:
-        _cell(tn, t("ps.rv_cell_tn", name=nn), "tn")
-    with r1[2]:
-        _cell(fp, t("ps.rv_cell_fp"), "fp")
-    r2 = st.columns([1.1, 1, 1])
-    r2[0].markdown(f"<div style='{_side}'>{t('ps.rv_actual', name=an)}</div>",
-                   unsafe_allow_html=True)
-    with r2[1]:
-        _cell(fn, t("ps.rv_cell_fn", name=an), "fn")
-    with r2[2]:
-        _cell(tp, t("ps.rv_cell_tp", name=an), "tp")
+    def _label(text, cls):
+        return f"<div class='{cls}'>{escape(text)}</div>"
+
+    # SATU kisi 3×3, bukan tiga baris `st.columns`: di bawah ±640 px Streamlit
+    # menumpuk kolom menjadi satu per baris, sehingga kedua judul "Prediksi"
+    # berimpitan dan bentuk matriksnya hilang di HP. Kisi CSS tetap tiga
+    # kolom di lebar berapa pun (ukurannya diatur `.ids-cm` di theme.py).
+    st.html(
+        "<div class='ids-cm'>"
+        "<div></div>"
+        + _label(t("ps.rv_predicted", name=nn), "ids-cm-head")
+        + _label(t("ps.rv_predicted", name=an), "ids-cm-head")
+        + _label(t("ps.rv_actual", name=nn), "ids-cm-side")
+        + _cell(tn, t("ps.rv_cell_tn", name=nn), "tn")
+        + _cell(fp, t("ps.rv_cell_fp"), "fp")
+        + _label(t("ps.rv_actual", name=an), "ids-cm-side")
+        + _cell(fn, t("ps.rv_cell_fn", name=an), "fn")
+        + _cell(tp, t("ps.rv_cell_tp", name=an), "tp")
+        + "</div>"
+    )
 
     st.markdown(t("ps.rv_security_reading"))
-    mcols = st.columns(3)
     _rec = b["attack_recall"]
-    mcols[0].metric(
-        t("ps.rv_attacks_caught"), _pct(tp) if total else "-",
-        help=t("ps.rv_help_caught", tp=f"{tp:,}",
-               total=f"{b['attack_total']:,}",
-               recall=(t("ps.rv_help_recall_suffix",
-                         pct=f"{(_rec * 100):.1f}%")
-                       if _rec is not None else "")))
-    mcols[1].metric(
-        t("ps.rv_attacks_missed"), f"{fn:,}",
-        help=(t("ps.rv_help_missed_pct",
-                pct=f"{(fn / b['attack_total'] * 100):.1f}%")
-              if b["attack_total"] else t("ps.rv_help_missed_unknown")))
-    mcols[2].metric(
-        t("ps.rv_false_alarms"), f"{fp:,}",
-        help=(t("ps.rv_help_fp_pct", pct=f"{(b['fp_rate'] * 100):.1f}%")
-              if b.get("fp_rate") is not None
-              else t("ps.rv_help_fp_unknown")))
+    render_counts([
+        (t("ps.rv_attacks_caught"), _pct(tp) if total else "-",
+         t("ps.rv_help_caught", tp=f"{tp:,}",
+           total=f"{b['attack_total']:,}",
+           recall=(t("ps.rv_help_recall_suffix",
+                     pct=f"{(_rec * 100):.1f}%")
+                   if _rec is not None else ""))),
+        (t("ps.rv_attacks_missed"), f"{fn:,}",
+         (t("ps.rv_help_missed_pct",
+            pct=f"{(fn / b['attack_total'] * 100):.1f}%")
+          if b["attack_total"] else t("ps.rv_help_missed_unknown"))),
+        (t("ps.rv_false_alarms"), f"{fp:,}",
+         (t("ps.rv_help_fp_pct", pct=f"{(b['fp_rate'] * 100):.1f}%")
+          if b.get("fp_rate") is not None
+          else t("ps.rv_help_fp_unknown"))),
+    ])
 
     # Kunci dict = label pilihan yang TAMPIL, jadi ia ikut bahasa; keduanya
     # berasal dari katalog yang sama sehingga tidak dapat bercampur.
@@ -414,11 +411,15 @@ def render_results(payload: dict, *, key: str, pipeline_id: str = "") -> None:
     pid = pipeline_id or payload.get("pipeline_id") or ""
     eid = str(key)
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Accuracy", f"{m.get('accuracy', 0):.4f}")
-    c2.metric("Precision", f"{m.get('precision', 0):.4f}")
-    c3.metric("Recall", f"{m.get('recall', 0):.4f}")
-    c4.metric("F1-Score", f"{m.get('f1_score', 0):.4f}")
+    # Kotak angka berkisi, bukan `st.columns(4)`: di HP kolom Streamlit
+    # menumpuk jadi empat baris berjarak lebar, sedangkan kisi ini turun ke
+    # dua kolom dengan sendirinya.
+    render_counts([
+        ("Accuracy", f"{m.get('accuracy', 0):.4f}"),
+        ("Precision", f"{m.get('precision', 0):.4f}"),
+        ("Recall", f"{m.get('recall', 0):.4f}"),
+        ("F1-Score", f"{m.get('f1_score', 0):.4f}"),
+    ])
 
     if "confusion_matrix" in m:
         st.subheader("Confusion Matrix")

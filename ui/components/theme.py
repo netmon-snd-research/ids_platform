@@ -1073,6 +1073,34 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 }}
 .ids-count-l {{ font-size: {FONT_CAPTION}; opacity: .72; line-height: 1.3; }}
 
+/* ── Confusion matrix ──────────────────────────────────────────────────
+   Kisi 3×3 (sudut kosong, dua judul "Prediksi", lalu dua baris "Aktual" +
+   dua sel). TETAP tiga kolom di lebar berapa pun: matriks yang ditumpuk
+   menjadi satu kolom bukan lagi matriks. Kolom label selebar isinya; kedua
+   kolom sel berbagi sisa lebar sama rata. */
+.ids-cm {{
+    display: grid;
+    grid-template-columns: minmax(4.5rem, max-content) 1fr 1fr;
+    gap: .5rem;
+    align-items: stretch;
+}}
+.ids-cm-head {{ text-align: center; font-weight: 600; font-size: .95rem;
+               align-self: end; overflow-wrap: anywhere; }}
+.ids-cm-side {{ font-weight: 600; font-size: .95rem; align-self: center;
+               overflow-wrap: anywhere; }}
+.ids-cm-cell {{ border-radius: 8px; padding: .6rem; text-align: center;
+               min-width: 0; }}
+.ids-cm-title {{ font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }}
+.ids-cm-n {{ font-size: 1.5rem; font-weight: 700; line-height: 1.3;
+            font-variant-numeric: tabular-nums; }}
+.ids-cm-pct {{ font-size: .95rem; opacity: .85; }}
+@media (max-width: {STACK_WIDTH}) {{
+    .ids-cm {{ gap: .35rem; grid-template-columns: minmax(3.5rem, max-content) 1fr 1fr; }}
+    .ids-cm-head, .ids-cm-side, .ids-cm-title, .ids-cm-pct {{ font-size: .75rem; }}
+    .ids-cm-n {{ font-size: 1.1rem; }}
+    .ids-cm-cell {{ padding: .4rem .3rem; }}
+}}
+
 /* Akar containment untuk `@container` di bawah. Tanpa ini, container query
    TIDAK PERNAH cocok — dan gagalnya tanpa suara. `inline-size` hanya
    membatasi arah mendatar, jadi tinggi konten tidak terpengaruh. */
