@@ -46,8 +46,8 @@ logger = logging.getLogger(__name__)
 #: dataset siap pakai oleh halaman Run Experiment.
 TRIAL_DATASET_ROOT = PIPELINE_ROOT / "trial_datasets"
 
-#: Batas ukuran dataset lampiran: 25 MB, sekitar 200× lebih kecil daripada
-#: batas unggah dataset platform (5 GB).
+#: Batas ukuran dataset lampiran: 25 MB, jauh lebih kecil daripada batas
+#: unggah dataset platform (20 GB).
 #:
 #: Angkanya diturunkan dari kegunaannya, bukan dikira-kira: uji coba membaca
 #: paling banyak 50.000 baris (``TRIAL_LIMITS["max_rows"]``), dan 25 MB sudah

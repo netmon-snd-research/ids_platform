@@ -112,11 +112,16 @@ _FORM_KEY = "_contrib_pkg_form"
 # Batas unggah peramban. Harus SEJALAN dengan server.maxUploadSize di
 # .streamlit/config.toml (dalam MB) — Streamlit menolak lebih dulu di sisi
 # server bila nilainya lebih kecil.
-MAX_DATASET_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024        # 5 GB
+#
+# 20 GB, bukan lebih: Streamlit menahan SELURUH unggahan di RAM container UI
+# sampai disimpan, dan CSV di atas pagu worker / 1,5 (32000 / 1,5 ≈ 21 GB pada
+# server lab) toh dikunci oleh `dataset_ram_blocker` di Run Experiment. Berkas
+# yang lebih besar tetap dapat masuk lewat tab Daftarkan dari server.
+MAX_DATASET_UPLOAD_BYTES = 20 * 1024 * 1024 * 1024       # 20 GB
 
 # Potongan awal berkas yang ditulis ke berkas sementara untuk didiagnosa.
 # Diagnosa hanya mencuplik 50.000 baris (± 27–30 MB pada dataset di repo ini),
-# jadi menyalin SELURUH unggahan 5 GB ke disk hanya untuk diperiksa itu sia-sia.
+# jadi menyalin SELURUH unggahan berukuran GB ke disk hanya untuk diperiksa itu sia-sia.
 # Prefix dipotong pada newline terakhir supaya tidak ada baris terpenggal.
 DIAGNOSIS_PREFIX_BYTES = 96 * 1024 * 1024                # 96 MB
 _COPY_CHUNK_BYTES = 4 * 1024 * 1024                      # 4 MB per tulis

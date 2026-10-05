@@ -44,7 +44,7 @@ RUN mkdir -p storage/datasets storage/artifacts && chown -R app:app /app
 # `--build-arg RUN_AS=app` benar-benar dicoba.
 ENV HOME=/home/app
 RUN mkdir -p "$HOME/.streamlit" \
-    && echo '[server]\nheadless = true\nport = 8501\nenableCORS = false\nenableXsrfProtection = false\nmaxUploadSize = 5120\n\n[browser]\ngatherUsageStats = false' > "$HOME/.streamlit/config.toml" \
+    && echo '[server]\nheadless = true\nport = 8501\nenableCORS = false\nenableXsrfProtection = false\nmaxUploadSize = 20480\n\n[browser]\ngatherUsageStats = false' > "$HOME/.streamlit/config.toml" \
     && chown -R app:app "$HOME"
 
 # Pengguna yang menjalankan aplikasi. BAWAANNYA `root`, dan itu keputusan

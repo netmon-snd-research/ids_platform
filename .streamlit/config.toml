@@ -5,7 +5,7 @@
 # ui/views/contribute.py — Streamlit menolak unggahan lebih besar dari nilai ini
 # di sisi server sebelum kode aplikasi sempat berjalan.
 [server]
-maxUploadSize = 5120        # MB (5 GB) — dataset EVE/HIKARI berukuran GB
+maxUploadSize = 20480       # MB (20 GB) — dataset EVE/HIKARI berukuran GB
 
 [browser]
 gatherUsageStats = false
