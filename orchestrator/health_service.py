@@ -153,7 +153,40 @@ def _check_execution_health(*, broker_timeout: float, worker_timeout: float) -> 
         return out
 
     worker_ok, count, wmsg = _probe_workers(worker_timeout)
+    if not worker_ok and _worker_busy(broker_timeout):
+        # Worker berjalan dengan `--pool=solo`: selama satu run berjalan, ia
+        # tidak memproses perintah kendali, jadi ping TIDAK PERNAH dijawab.
+        # Tanda hidup run itu sendiri (workers.heartbeat) adalah bukti bahwa
+        # worker hidup — ia sibuk, bukan mati. Tanpa pemeriksaan ini, setiap
+        # run yang berjalan membuat UI melaporkan "tidak ada worker" dan
+        # mengunci tombol Run, padahal run baru cukup masuk antrean.
+        out.update(worker_ok=True, worker_count=1, can_run=True,
+                   message="Worker sedang menjalankan eksperimen; run baru "
+                           "akan masuk antrean.")
+        return out
     out.update(worker_ok=worker_ok, worker_count=count, can_run=bool(worker_ok))
     if not worker_ok:
         out["message"] = wmsg or "Tidak ada worker Celery yang aktif."
     return out
+
+
+def _worker_busy(timeout: float) -> bool:
+    """Apakah ada run yang tanda hidupnya masih segar? Tidak pernah melempar.
+
+    Kunci hidup (``ids:heartbeat:<id>``) ber-TTL pendek dan diperbarui worker
+    selama run berjalan, jadi adanya satu kunci saja berarti worker hidup.
+    Pola ini tidak mencocokkan salinan ``ids:heartbeat-last:`` yang bertahan
+    sehari setelah worker berhenti.
+    """
+    try:
+        import redis
+        from config.celery_config import CELERY_RESULT_BACKEND
+        from workers.heartbeat import KEY_PREFIX
+        client = redis.Redis.from_url(
+            CELERY_RESULT_BACKEND, socket_connect_timeout=timeout,
+            socket_timeout=timeout,
+        )
+        return next(client.scan_iter(match=f"{KEY_PREFIX}*", count=100), None) is not None
+    except Exception:  # noqa: BLE001 — tidak tahu bukan berarti hidup
+        logger.debug("heartbeat probe failed", exc_info=True)
+        return False
