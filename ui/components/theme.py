@@ -1220,6 +1220,65 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
     }}
 }}
 
+/* ── Pengecualian penumpukan: baris kontrol yang pendek ─────────────────
+   Menumpuk satu kolom per baris tepat untuk isi, tetapi salah untuk deretan
+   tombol pendek: di HP "Filter", "Kolom", dan kotak pencarian riwayat
+   masing-masing memakan satu baris penuh. Dua baris yang ditandai di bawah
+   (penandanya di ui/views/view_results.py) tetap sebaris di layar sempit.
+
+   `.ids-hist-bar` — kolom: Filter, Kolom, pencarian, penyangga, Unduh CSV.
+   Tombol-tombolnya selebar isinya di satu baris (CSV terdorong ke kanan),
+   pencarian turun ke baris penuh di bawahnya, penyangga disembunyikan.
+   `.ids-dash-head` — kolom: judul, Auto-refresh, Perbarui. Judul satu baris
+   penuh, kedua kontrol berbagi baris berikutnya sama rata.
+
+   Selektornya lebih khusus daripada aturan menumpuk di atas, jadi menang
+   tanpa !important. */
+@container (max-width: {STACK_WIDTH}) {{
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"] {{
+        flex: 0 0 auto; min-width: 0; width: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(3) {{
+        order: 5; flex: 1 1 100%; min-width: 100%;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(4) {{
+        display: none;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(5) {{
+        margin-left: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-dash-head)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:not(:first-child) {{
+        flex: 1 1 0; min-width: 0; width: auto; align-self: center;
+    }}
+}}
+@media (max-width: {STACK_WIDTH}) {{
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"] {{
+        flex: 0 0 auto; min-width: 0; width: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(3) {{
+        order: 5; flex: 1 1 100%; min-width: 100%;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(4) {{
+        display: none;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-hist-bar)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:nth-child(5) {{
+        margin-left: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-dash-head)
+        [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"]:not(:first-child) {{
+        flex: 1 1 0; min-width: 0; width: auto; align-self: center;
+    }}
+}}
+
 /* Tabel & kerangka lebar: DIGULIR mendatar, bukan dipaksa masuk sampai
    kolomnya terpotong. */
 [data-testid="{DATAFRAME}"] {{ max-width: 100%; }}

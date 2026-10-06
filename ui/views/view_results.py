@@ -873,7 +873,12 @@ def _render_running_section(experiments) -> tuple:
     card shows status + elapsed only — never a fabricated percentage."""
     running = select_running(experiments)
 
-    head = st.columns([3, 1, 1])
+    # Penanda `.ids-dash-head`: di layar sempit judul tetap satu baris penuh,
+    # tetapi Auto-refresh dan Perbarui berdampingan alih-alih dua baris.
+    head_box = st.container()
+    head_box.markdown('<span class="ids-dash-head"></span>', unsafe_allow_html=True)
+    with head_box:
+        head = st.columns([3, 1, 1])
     head[0].subheader(t("ps.running_title"))
     if hasattr(head[1], "toggle"):
         auto = head[1].toggle("Auto-refresh", value=True, key="_dash_auto")
@@ -1233,7 +1238,15 @@ def _render_history(experiments: list[dict], all_rows: list[dict]) -> None:
     # "Unduh CSV" ikut menyusut: ia tindakan sekunder, dan lebar sebelumnya
     # membuatnya tombol terbesar di halaman, lebih menonjol daripada tabel
     # yang justru menjadi isi halaman ini.
-    bar = st.columns([2, 2, 12, 6, 3])
+    # Wadah sendiri + penanda `.ids-hist-bar`: di layar sempit baris ini TIDAK
+    # ikut ditumpuk satu-kolom-per-baris seperti kolom lain (lihat theme.py) —
+    # Filter, Kolom, dan Unduh CSV tetap sebaris, pencarian turun ke baris
+    # penuh di bawahnya. Wadah sendiri supaya penanda itu tidak ikut mengenai
+    # baris kolom lain di halaman.
+    bar_box = st.container()
+    bar_box.markdown('<span class="ids-hist-bar"></span>', unsafe_allow_html=True)
+    with bar_box:
+        bar = st.columns([2, 2, 12, 6, 3])
     with bar[0]:
         filters = _render_filters(all_rows)
     with bar[1]:
