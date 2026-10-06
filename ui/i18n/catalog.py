@@ -4503,4 +4503,9 @@ CATALOG: dict[str, dict[str, str]] = {
     "up.resume": {"id": "Lanjutkan unggahan", "en": "Resume upload"},
     "up.paused_at": {"id": "Dijeda di {done} ({pct}) · tekan ▶ untuk melanjutkan.",
                      "en": "Paused at {done} ({pct}) · press ▶ to resume."},
+    # Indikator di pojok halaman saat unggahan berjalan sementara pengguna
+    # berada di halaman lain.
+    "up.pill": {"id": "Mengunggah {name} · {pct}", "en": "Uploading {name} · {pct}"},
+    "up.pill_paused": {"id": "Dijeda: {name} · {pct}", "en": "Paused: {name} · {pct}"},
+    "up.pill_retry": {"id": "Menyambung ulang: {name} · {pct}", "en": "Reconnecting: {name} · {pct}"},
 }
