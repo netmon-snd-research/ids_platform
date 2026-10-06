@@ -233,6 +233,22 @@ def write_chunk(token: str, offset: int, data: bytes) -> dict:
         return dict(upload)
 
 
+def cancel(token: str) -> None:
+    """Batalkan unggahan token ini: berkas parsialnya DIHAPUS, tokennya tetap.
+
+    Token tetap berlaku supaya kontrol yang sama langsung dapat dipakai untuk
+    berkas lain tanpa memuat ulang halaman.
+    """
+    with _lock:
+        entry = _entry(token)
+        upload, entry["upload"] = entry["upload"], None
+    if upload:
+        try:
+            Path(upload["path"]).unlink(missing_ok=True)
+        except OSError:                       # pragma: no cover - defensif
+            pass
+
+
 def status(token: str) -> dict:
     with _lock:
         entry = _entry(token)
@@ -302,6 +318,9 @@ def routes() -> list:
 
     async def status_route(request: Request) -> JSONResponse:
         try:
+            if request.method == "DELETE":
+                await run_in_threadpool(cancel, request.path_params["token"])
+                return JSONResponse({"received": 0, "done": False})
             upload = await run_in_threadpool(status, request.path_params["token"])
         except UploadError as e:
             return _error(e)
@@ -310,5 +329,5 @@ def routes() -> list:
     return [
         Route(f"{ROUTE_PREFIX}/begin", begin_route, methods=["POST"]),
         Route(f"{ROUTE_PREFIX}/{{token}}/chunk", chunk_route, methods=["PUT"]),
-        Route(f"{ROUTE_PREFIX}/{{token}}", status_route, methods=["GET"]),
+        Route(f"{ROUTE_PREFIX}/{{token}}", status_route, methods=["GET", "DELETE"]),
     ]

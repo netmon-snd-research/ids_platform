@@ -4030,24 +4030,13 @@ def _render_dataset_upload_tab() -> None:
     # Unggahan BERTAHAP, bukan `st.file_uploader`: berkas dikirim per potongan
     # 8 MB, dicoba ulang bila jaringan putus, dan dapat dilanjutkan — satu
     # request 5 GB lewat VPS dan VPN gagal seluruhnya pada satu putus sesaat.
-    from ui.components.chunked_uploader import finish, render_chunked_uploader
-    uploaded = render_chunked_uploader(
-        current_user()["username"],
-        help_text=(f"Batas unggah {limit_gb:.0f} GB. Berkas yang lebih besar "
-                   f"didaftarkan lewat tab Daftarkan dari server. Jangan "
-                   f"tinggalkan halaman ini selama unggahan berjalan; bila "
-                   f"terputus, pilih berkas yang sama lagi untuk melanjutkan."))
+    # Berkas tampil sebagai baris di bawah kotak unggah, lengkap dengan bilah
+    # progres dan tombol batal (×); membatalkan berkas yang sudah lengkap
+    # membuangnya dari server dan halaman kembali ke kotak unggah kosong.
+    from ui.components.chunked_uploader import render_chunked_uploader
+    uploaded = render_chunked_uploader(current_user()["username"])
     if uploaded is None:
         return
-
-    with st.container(border=True):
-        ganti = st.columns([3, 1])
-        ganti[0].markdown(f"`{uploaded.name}` · {format_size(uploaded.size)} · diterima utuh")
-        if ganti[1].button("Pilih berkas lain", key="contrib_chunk_discard",
-                           use_container_width=True):
-            finish(uploaded.token, delete_part=True)
-            st.session_state.pop(_DS_DIAG_KEY, None)
-            st.rerun()
 
     safe = safe_dataset_name(uploaded.name)
     if safe is None:

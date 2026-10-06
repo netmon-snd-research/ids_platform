@@ -4474,4 +4474,29 @@ CATALOG: dict[str, dict[str, str]] = {
     "progress.running_count": {
         "id": "{count} berjalan",
         "en": "{count} running"},
+
+    # ── Kontrol unggah dataset bertahap (ui/components/chunked_uploader.py) ──
+    # Teks di dalam iframe kontrol unggah. Placeholder {..} diisi JavaScript.
+    "up.btn": {"id": "Upload", "en": "Upload"},
+    "up.hint": {"id": "{limit} per berkas • {formats}",
+                "en": "{limit} per file • {formats}"},
+    "up.drop": {"id": "Lepaskan berkas di sini", "en": "Drop the file here"},
+    "up.connecting": {"id": "Menghubungi server…", "en": "Contacting the server…"},
+    "up.resuming": {"id": "Melanjutkan dari {done}…", "en": "Resuming from {done}…"},
+    "up.keep_open": {"id": "Jangan tutup halaman ini selama mengunggah.",
+                     "en": "Keep this page open while uploading."},
+    "up.left": {"id": "sisa ±{min} menit", "en": "±{min} min left"},
+    "up.retry": {"id": "Koneksi terganggu, mencoba lagi dalam {sec} detik · {safe} sudah aman di server.",
+                 "en": "Connection interrupted, retrying in {sec}s · {safe} already safe on the server."},
+    "up.done": {"id": "Diterima utuh · memeriksa berkas…",
+                "en": "Received in full · checking the file…"},
+    "up.received": {"id": "Diterima utuh", "en": "Received in full"},
+    "up.paused": {"id": "Terhenti di {done}. Pilih berkas yang sama untuk melanjutkan.",
+                  "en": "Stopped at {done}. Pick the same file to resume."},
+    "up.too_big": {"id": "Melebihi batas {limit}.", "en": "Exceeds the {limit} limit."},
+    "up.expired": {"id": "Sesi unggah berakhir. Muat ulang halaman, lalu pilih berkas yang sama untuk melanjutkan.",
+                   "en": "The upload session ended. Reload the page, then pick the same file to resume."},
+    "up.stopped": {"id": "Unggahan berhenti ({err}). Pilih berkas yang sama untuk melanjutkan.",
+                   "en": "The upload stopped ({err}). Pick the same file to resume."},
+    "up.cancel": {"id": "Batalkan dan hapus berkas ini", "en": "Cancel and remove this file"},
 }
