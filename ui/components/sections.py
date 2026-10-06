@@ -244,3 +244,36 @@ def render_counts(pairs) -> None:
     if not cells:
         return
     st.html(f'<div class="ids-counts">{"".join(cells)}</div>')
+
+
+def mobile_card_labels(marker: str, labels: dict[int, str]) -> None:
+    """Label sel untuk tabel yang tampil sebagai KARTU di layar sempit.
+
+    Pasangannya pola `.ids-mcard` di theme.py: di layar sempit judul kolom
+    tabel disembunyikan, sehingga sel yang hanya berisi angka ("6") tidak lagi
+    mengatakan apa artinya. Fungsi ini memberi sel itu labelnya sendiri
+    ("Algoritma: 6"), hanya di layar sempit.
+
+    ``marker`` adalah kelas KHUSUS tabel ini yang ikut ditempel pada penanda
+    barisnya (mis. ``ids-rs-row``), supaya label satu tabel tidak mengenai
+    tabel lain yang berbagi pola kartu. ``labels`` memetakan nomor kolom
+    (mulai 1, seperti ``:nth-child``) ke teks label pada bahasa aktif.
+    Dipanggil sekali per tabel, sebelum barisnya digambar.
+    """
+    from ui.components.theme import COL_ONE, COL_ROW, STACK_WIDTH
+
+    def _css_string(text: str) -> str:
+        return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + ': "'
+
+    rules = []
+    for index, label in sorted(labels.items()):
+        rules.append(
+            f'div[data-testid="stVerticalBlock"]:has(> .stElementContainer .{marker}) '
+            f'[data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) '
+            f'> [data-testid="{COL_ONE}"]:nth-child({int(index)}) '
+            f'[data-testid="stMarkdownContainer"] p::before '
+            f'{{ content: {_css_string(label)}; opacity: .65; }}')
+    if rules:
+        st.markdown(
+            f"<style>@container (max-width: {STACK_WIDTH}) {{ {' '.join(rules)} }}</style>",
+            unsafe_allow_html=True)

@@ -481,8 +481,13 @@ _RS_COLS = (
 
 def _render_head() -> None:
     """Kepala tabel, memakai jangkar baris yang sama dengan tabel lain."""
+    # Di layar sempit tabel ini tampil sebagai kartu (`.ids-mcard` di theme.py)
+    # dan judul kolomnya disembunyikan; jumlah algoritma karena itu membawa
+    # labelnya sendiri. Status tidak perlu: "🟢 Aktif" sudah terbaca sendiri.
+    from ui.components.sections import mobile_card_labels
+    mobile_card_labels("ids-rs-row", {2: t("rs.col_algorithms")})
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns([b for _, b in _RS_COLS],
                             vertical_alignment="center")
@@ -500,7 +505,7 @@ def _render_row(row: dict, user: dict | None) -> None:
     """
     dtype = row["dataset_type"]
     with st.container(border=True):
-        st.markdown('<span class="ids-queue-row"></span>',
+        st.markdown('<span class="ids-queue-row ids-mcard ids-rs-row"></span>',
                     unsafe_allow_html=True)
         sel = st.columns([b for _, b in _RS_COLS], vertical_alignment="center")
 

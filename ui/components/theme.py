@@ -767,6 +767,32 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     border-color: rgba(127,127,127,.35);
     font-weight: {WEIGHT_NORMAL};
 }}
+/* ── Tabel berbaris kolom → KARTU di layar sempit (pola umum) ──────────
+   Tabel yang ditandai `.ids-mcard` (baris) dan `.ids-mcard-head` (judul):
+   judul kolom disembunyikan; tiap baris menjadi kartu — kolom pertama
+   (nama) dan terakhir (aksi) selebar penuh, kolom-kolom di antaranya
+   (angka, status) berdampingan selebar isinya. Label sel yang membutuhkannya
+   disuntikkan per tabel lewat `sections.mobile_card_labels`. */
+@container (max-width: {STACK_WIDTH}) {{
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-mcard-head) {{
+        display: none;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-mcard)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) {{
+        flex-wrap: wrap; row-gap: .35rem; column-gap: 1rem;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-mcard)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"] {{
+        flex: 0 0 auto; min-width: 0; width: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-mcard)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:is(:first-child, :last-child) {{
+        flex: 1 1 100%;
+    }}
+}}
+
 /* ── Tabel pengguna di layar sempit: KARTU per akun ────────────────────
    Tujuh kolom yang ditumpuk satu per baris membuat judul kolom menjadi tujuh
    baris yang tidak menunjuk ke apa pun, dan setiap akun setinggi satu layar.
