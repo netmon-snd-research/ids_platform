@@ -45,7 +45,8 @@ from ui.components.page_flags import wait_before_refresh
 # ulang berhenti (eksperimennya sendiri tidak disentuh).
 PAGE_NAME = 'Run Experiment'
 from ui.components.sections import (
-    back_button, prose, render_facts, render_section, section_body,
+    back_button, card_labels, mobile_card_labels, prose, render_facts,
+    render_section, section_body,
 )
 from streamlit_option_menu import option_menu
 from contracts.dataset_schemas import get_schema
@@ -1339,8 +1340,11 @@ def _render_dataset_table(options, sizes) -> None:
     # di bawahnya.
     if cocok:
         lebar = [b for _, b in _DS_COLS]
+        # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+        # di antara nama dan aksi membawa labelnya sendiri.
+        mobile_card_labels('ids-q-ds', card_labels(_DS_COLS, skip=()))
         with st.container():
-            st.markdown('<span class="ids-queue-head"></span>',
+            st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                         unsafe_allow_html=True)
             kepala = st.columns(lebar, vertical_alignment="center")
             for kol, (kunci, _) in zip(kepala, _DS_COLS):
@@ -1348,7 +1352,7 @@ def _render_dataset_table(options, sizes) -> None:
 
         for row in cocok:
             with st.container(border=True):
-                st.markdown('<span class="ids-queue-row"></span>',
+                st.markdown('<span class="ids-queue-row ids-mcard ids-q-ds"></span>',
                             unsafe_allow_html=True)
                 sel = st.columns(lebar, vertical_alignment="center")
                 nama = html.escape(str(row["name"]))

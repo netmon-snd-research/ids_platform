@@ -246,6 +246,24 @@ def render_counts(pairs) -> None:
     st.html(f'<div class="ids-counts">{"".join(cells)}</div>')
 
 
+def card_labels(cols, *, skip=()) -> dict[int, str]:
+    """Label kartu dari definisi kolom tabel ``((kunci_i18n, bobot), …)``.
+
+    Melabeli setiap kolom SESUDAH kolom pertama yang punya judul, kecuali yang
+    ada di ``skip``. Kolom pertama (nama/ID) terbaca sendiri; kolom tanpa judul
+    adalah kolom aksi; dan kolom di ``skip`` berisi pil keadaan yang sudah
+    membawa artinya sendiri ("Lolos", "🟢 Aktif"). Nomor kolom mulai 1, sama
+    dengan ``:nth-child``.
+    """
+    from ui.i18n import t
+
+    out = {}
+    for index, (key, *_rest) in enumerate(cols, start=1):
+        if index > 1 and key and key not in skip:
+            out[index] = t(key)
+    return out
+
+
 def mobile_card_labels(marker: str, labels: dict[int, str]) -> None:
     """Label sel untuk tabel yang tampil sebagai KARTU di layar sempit.
 
@@ -267,11 +285,14 @@ def mobile_card_labels(marker: str, labels: dict[int, str]) -> None:
 
     rules = []
     for index, label in sorted(labels.items()):
+        sel = (f'div[data-testid="stVerticalBlock"]:has(> .stElementContainer .{marker}) '
+               f'[data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) '
+               f'> [data-testid="{COL_ONE}"]:nth-child({int(index)})')
+        # Sel berlabel berdiri satu per baris ("Dibuat: …"); yang tidak
+        # berlabel (pil keadaan) tetap berdampingan selebar isinya.
+        rules.append(f'{sel} {{ flex: 1 1 100%; }}')
         rules.append(
-            f'div[data-testid="stVerticalBlock"]:has(> .stElementContainer .{marker}) '
-            f'[data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) '
-            f'> [data-testid="{COL_ONE}"]:nth-child({int(index)}) '
-            f'[data-testid="stMarkdownContainer"] p::before '
+            f'{sel} [data-testid="stMarkdownContainer"] p::before '
             f'{{ content: {_css_string(label)}; opacity: .65; }}')
     if rules:
         st.markdown(

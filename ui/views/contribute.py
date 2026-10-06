@@ -96,7 +96,8 @@ from ui.components.validator_messages import (
     check_message, error_message,
 )
 from ui.components.sections import (
-    back_button, detail_facts, prose, render_facts, render_section,
+    back_button, card_labels, detail_facts, mobile_card_labels, prose,
+    render_facts, render_section,
 )
 from utils.timestamps import now_iso
 from ui.components.upload_cards import render_upload_cards
@@ -354,9 +355,12 @@ def _queue_badge(row: dict) -> str:
 def _render_queue_grid(rows: list[dict]) -> None:
     """Antrean peninjauan: satu baris per pengajuan, tombol buka di barisnya."""
     lebar = [b for _, b in _QUEUE_COLS]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-queue', card_labels(_QUEUE_COLS, skip=('rv.col_check_result',)))
 
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, (kunci, _) in zip(kepala, _QUEUE_COLS):
@@ -364,7 +368,7 @@ def _render_queue_grid(rows: list[dict]) -> None:
 
     for row in rows:
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-queue"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             sel[0].markdown(
@@ -1058,8 +1062,11 @@ def _render_trial_table(item: dict) -> None:
     from ui.components.validator_messages import trial_stage
 
     lebar = [b for _, b in _TRIAL_COLS]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-trial', card_labels(_TRIAL_COLS, skip=()))
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, (kunci, _) in zip(kepala, _TRIAL_COLS):
@@ -1067,7 +1074,7 @@ def _render_trial_table(item: dict) -> None:
 
     for row in baris:
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-trial"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             sel[0].markdown(human_datetime(row["at"]))
@@ -1444,9 +1451,12 @@ def _render_file_table(item: dict, files: list[dict]) -> None:
     # yang perlu dibuka, dan isinya dibuka ketika diminta.
     terbuka = opened if any(r["filename"] == opened for r in rows) else None
     lebar = [b for _, b in _FILE_COLS]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-file', card_labels(_FILE_COLS, skip=('rv.col_check_result',)))
 
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, (kunci, _) in zip(kepala, _FILE_COLS):
@@ -1455,7 +1465,7 @@ def _render_file_table(item: dict, files: list[dict]) -> None:
     for row in rows:
         nama = row["filename"]
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-file"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             tanda = "**" if nama == terbuka else ""
@@ -1632,9 +1642,12 @@ def _render_revision_table(item: dict, riwayat: list[dict]) -> None:
     terbuka = (dibuka if any(r["round"] == dibuka for r in urut)
                else urut[0]["round"])
     lebar = [b for _, b in _ROUND_COLS]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-round', card_labels(_ROUND_COLS, skip=()))
 
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, (kunci, _) in zip(kepala, _ROUND_COLS):
@@ -1643,7 +1656,7 @@ def _render_revision_table(item: dict, riwayat: list[dict]) -> None:
     for baris in urut:
         putaran = baris["round"]
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-round"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             tanda = "**" if putaran == terbuka else ""
@@ -2434,6 +2447,20 @@ def _user_cell(value) -> str:
     return teks or _USER_EMPTY
 
 
+def _md_cell(text: str) -> str:
+    """Isi sel untuk `st.markdown`, dengan penanda kosong yang AMAN.
+
+    "-" sendirian adalah sintaks daftar markdown: ia tergambar sebagai butir
+    kosong, bukan tanda hubung, sehingga sel kosong tampil sebagai celah
+    tanpa tanda apa pun. Penandanya ditulis sebagai teks biasa berkelas
+    `ids-cell-empty`, yang juga dipakai tampilan kartu di layar sempit untuk
+    menyembunyikan baris yang memang tidak berisi apa-apa.
+    """
+    if text == _USER_EMPTY:
+        return f'<span class="ids-cell-empty">{_USER_EMPTY}</span>'
+    return escape(text)
+
+
 def _activated_cell(row: dict) -> str:
     """Siapa mengaktifkan akun ini, dan kapan.
 
@@ -2579,34 +2606,24 @@ def _render_users_flow() -> None:
     # baris berbingkai di bawahnya — tanpa itu judul kolom berdiri di trek yang
     # bergeser dari selnya. Lihat `USER_ROW_PAD` di theme.py.
     with st.container():
-        st.markdown('<span class="ids-user-head"></span>',
+        st.markdown('<span class="ids-user-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(_USER_COLS, vertical_alignment="center")
         for kol, kunci in zip(kepala, _USER_HEADERS):
             kol.markdown(f"**{t(kunci)}**" if kunci else "")
 
-    # Label sel untuk tampilan KARTU di layar sempit (aturannya di theme.py,
-    # "Tabel pengguna di layar sempit"). Di sana judul kolom disembunyikan,
-    # jadi Instansi / Dibuat / Diaktifkan membawa labelnya sendiri. Teksnya
-    # mengikuti bahasa aktif, karena itu disuntikkan di sini, bukan ditulis
-    # mati di stylesheet.
-    def _css_label(key: str) -> str:
-        teks = t(key).replace("\\", "\\\\").replace('"', '\\"')
-        return f'"{teks}: "'
-
-    st.markdown(
-        "<style>:root{"
-        f"--ids-u-inst:{_css_label('ap.users_col_institution')};"
-        f"--ids-u-created:{_css_label('ap.users_col_created')};"
-        f"--ids-u-activated:{_css_label('ap.users_col_activated')};"
-        "}</style>",
-        unsafe_allow_html=True,
-    )
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi Instansi / Dibuat
+    # / Diaktifkan membawa labelnya sendiri. Peran dan Status adalah pil yang
+    # terbaca sendiri, jadi tidak dilabeli.
+    mobile_card_labels("ids-user-row", card_labels(
+        zip(_USER_HEADERS, _USER_COLS),
+        skip=("ap.users_col_role", "ap.users_col_status",
+              "ap.users_col_actions")))
 
     for row in users:
         with st.container(border=True):
             # Jangkar perapat baris; aturannya tinggal di theme.py.
-            st.markdown('<span class="ids-user-row"></span>',
+            st.markdown('<span class="ids-user-row ids-mcard"></span>',
                         unsafe_allow_html=True)
             # `center`: sel terpendek pun berdiri di tengah barisnya, jadi
             # tombol sejajar dengan pil dan teks di sebelahnya — bawaan `top`
@@ -2624,9 +2641,12 @@ def _render_users_flow() -> None:
             cols[0].markdown(nama, unsafe_allow_html=True)
             cols[1].markdown(_role_badge(row), unsafe_allow_html=True)
             cols[2].markdown(row["status_label"])
-            cols[3].markdown(_user_cell(row.get("institution")))
-            cols[4].markdown(_user_cell(format_stamp(row.get("created_at"))))
-            cols[5].markdown(_activated_cell(row))
+            cols[3].markdown(_md_cell(_user_cell(row.get("institution"))),
+                             unsafe_allow_html=True)
+            cols[4].markdown(_md_cell(_user_cell(format_stamp(row.get("created_at")))),
+                             unsafe_allow_html=True)
+            cols[5].markdown(_md_cell(_activated_cell(row)),
+                             unsafe_allow_html=True)
 
             if is_self:
                 # Akun sendiri tidak dapat dinonaktifkan atau diturunkan dari

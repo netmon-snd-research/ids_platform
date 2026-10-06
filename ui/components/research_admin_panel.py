@@ -32,7 +32,9 @@ from ui.components import code_box
 from ui.components import grid
 from ui.components.pipeline_upload import ROLE_ENTRY
 from ui.components.tables import human_datetime
-from ui.components.sections import prose, render_section
+from ui.components.sections import (
+    card_labels, mobile_card_labels, prose, render_section,
+)
 from ui.components.theme import dark_button_scope
 from ui.i18n import t
 
@@ -452,8 +454,11 @@ def _render_package_table(row: dict, berkas: dict) -> str:
         st.session_state.setdefault(_FILE_KEY, {})[str(pipeline_id)] = terbuka
 
     lebar = [b for _, b in _PKG_COLS]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-pkg', card_labels(_PKG_COLS, skip=('rv.col_check_result',)))
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, (kunci, _) in zip(kepala, _PKG_COLS):
@@ -462,7 +467,7 @@ def _render_package_table(row: dict, berkas: dict) -> str:
     for b in baris:
         nama = b["filename"]
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-pkg"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             tanda = "**" if nama == terbuka else ""
@@ -722,8 +727,11 @@ def _render_run_results(pipeline_id: str) -> None:
         return
 
     lebar = [6, 5, 5]
+    # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+    # di antara nama dan aksi membawa labelnya sendiri.
+    mobile_card_labels('ids-q-runs', card_labels(((k, 0) for k in ("ps.col_id", "ps.col_status", "ps.lbl_created")), skip=('ps.col_status',)))
     with st.container():
-        st.markdown('<span class="ids-queue-head"></span>',
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
         kepala = st.columns(lebar, vertical_alignment="center")
         for kol, kunci in zip(kepala, ("ps.col_id", "ps.col_status",
@@ -734,7 +742,7 @@ def _render_run_results(pipeline_id: str) -> None:
         status = str(r.get("status") or "")
         keadaan = {"COMPLETED": "ok", "FAILED": "bad"}.get(status, "warn")
         with st.container(border=True):
-            st.markdown('<span class="ids-queue-row"></span>',
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-runs"></span>',
                         unsafe_allow_html=True)
             sel = st.columns(lebar, vertical_alignment="center")
             sel[0].markdown(escape(_ringkas(str(r.get("id") or ""), 12)))
@@ -831,8 +839,11 @@ def _render_version_history(row: dict, user: dict | None) -> None:
         # `version_history` mengurutkan terbaru lebih dulu; pembanding tiap
         # baris adalah versi TEPAT di bawahnya pada urutan itu.
         lebar = [b for _, b in _VERSION_COLS]
+        # Kartu di layar sempit: judul kolom disembunyikan, jadi sel
+        # di antara nama dan aksi membawa labelnya sendiri.
+        mobile_card_labels('ids-q-version', card_labels(_VERSION_COLS, skip=()))
         with st.container():
-            st.markdown('<span class="ids-queue-head"></span>',
+            st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                         unsafe_allow_html=True)
             kepala = st.columns(lebar, vertical_alignment="center")
             for kol, (kunci, _) in zip(kepala, _VERSION_COLS):
@@ -851,7 +862,7 @@ def _render_version_history(row: dict, user: dict | None) -> None:
                     or t("re.value_unrecorded"))
             kapan = baris.get("edited_at") or baris.get("registered_at")
             with st.container(border=True):
-                st.markdown('<span class="ids-queue-row"></span>',
+                st.markdown('<span class="ids-queue-row ids-mcard ids-q-version"></span>',
                             unsafe_allow_html=True)
                 sel = st.columns(lebar, vertical_alignment="center")
                 tanda = "**" if versi == terbuka else ""

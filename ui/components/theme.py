@@ -791,56 +791,25 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
         > [data-testid="{COL_ONE}"]:is(:first-child, :last-child) {{
         flex: 1 1 100%;
     }}
-}}
-
-/* ── Tabel pengguna di layar sempit: KARTU per akun ────────────────────
-   Tujuh kolom yang ditumpuk satu per baris membuat judul kolom menjadi tujuh
-   baris yang tidak menunjuk ke apa pun, dan setiap akun setinggi satu layar.
-   Di layar sempit: judul kolom disembunyikan; tiap baris menjadi kartu —
-   nama di atas, pil Peran + Status berdampingan, lalu Instansi / Dibuat /
-   Diaktifkan masing-masing DENGAN labelnya (dua tanggal tanpa label tidak
-   dapat dibedakan), lalu tombol aksi berdampingan. Teks label mengikuti
-   bahasa aktif, jadi disuntikkan halaman kelola pengguna sebagai variabel
-   `--ids-u-*` (ui/views/contribute.py). Desktop tidak tersentuh. */
-@container (max-width: {STACK_WIDTH}) {{
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-head) {{
+    /* Sel KOSONG tidak ikut menjadi baris kartu: kolom tanpa isi (aksi pada
+       akun sendiri), penanda `.ids-cell-empty`, dan "-" yang digambar
+       markdown sebagai butir daftar kosong. Di tabel desktop kolomnya tetap
+       ada; di kartu, baris kosong hanya menjadi celah. */
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-mcard)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:is(
+            :not(:has([data-testid="stElementContainer"])),
+            :has(.ids-cell-empty),
+            :has([data-testid="stMarkdownContainer"] > ul > li:only-child:empty)) {{
         display: none;
     }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) {{
-        flex-wrap: wrap; row-gap: .35rem; column-gap: .6rem;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"] {{
-        flex: 1 1 100%; min-width: 0; width: auto;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"]:is(:nth-child(2), :nth-child(3)) {{
-        flex: 0 0 auto;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"]:is(:nth-child(4), :nth-child(5), :nth-child(6)) {{
-        font-size: .85rem;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"]:nth-child(4) [data-testid="stMarkdownContainer"] p::before {{
-        content: var(--ids-u-inst, ""); opacity: .65;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"]:nth-child(5) [data-testid="stMarkdownContainer"] p::before {{
-        content: var(--ids-u-created, ""); opacity: .65;
-    }}
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
-        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
-        > [data-testid="{COL_ONE}"]:nth-child(6) [data-testid="stMarkdownContainer"] p::before {{
-        content: var(--ids-u-activated, ""); opacity: .65;
-    }}
-    /* Tombol utama + panel Aksi di kolom terakhir: berdampingan. */
+}}
+
+/* ── Tabel pengguna di layar sempit ────────────────────────────────────
+   Memakai pola kartu umum di atas (`.ids-mcard`, label dari contribute.py).
+   Yang khusus di sini hanya kolom aksinya: tombol utama dan panel "Aksi"
+   bersarang dalam satu kolom, dan keduanya berdampingan sama lebar. */
+@container (max-width: {STACK_WIDTH}) {{
     div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
         [data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"] {{
         flex: 1 1 0; min-width: 0; width: auto;
