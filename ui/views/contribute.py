@@ -110,15 +110,14 @@ _MODE_KEY = "_contrib_mode"
 _RESULT_KEY = "_contrib_pkg_result"
 _FORM_KEY = "_contrib_pkg_form"
 
-# Batas unggah peramban. Harus SEJALAN dengan server.maxUploadSize di
-# .streamlit/config.toml (dalam MB) — Streamlit menolak lebih dulu di sisi
-# server bila nilainya lebih kecil.
-#
-# 20 GB, bukan lebih: Streamlit menahan SELURUH unggahan di RAM container UI
-# sampai disimpan, dan CSV di atas pagu worker / 1,5 (32000 / 1,5 ≈ 21 GB pada
-# server lab) toh dikunci oleh `dataset_ram_blocker` di Run Experiment. Berkas
-# yang lebih besar tetap dapat masuk lewat tab Daftarkan dari server.
-MAX_DATASET_UPLOAD_BYTES = 20 * 1024 * 1024 * 1024       # 20 GB
+# Batas unggah dataset, ekstensi, dan sanitasi nama tinggal di SATU tempat
+# bersama rute unggah bertahap, supaya peramban dan server tidak pernah
+# memakai aturan yang berbeda. Dataset tidak lagi melewati `st.file_uploader`
+# (lihat orchestrator/chunked_upload.py), jadi batas ini TIDAK lagi terikat
+# pada server.maxUploadSize.
+from orchestrator.chunked_upload import (  # noqa: E402
+    DATASET_EXTENSIONS, MAX_DATASET_UPLOAD_BYTES, safe_dataset_name,
+)
 
 # Potongan awal berkas yang ditulis ke berkas sementara untuk didiagnosa.
 # Diagnosa hanya mencuplik 50.000 baris (± 27–30 MB pada dataset di repo ini),
@@ -3810,27 +3809,6 @@ def _render_pipeline_flow() -> None:
 
 # ── Jalur dataset ─────────────────────────────────────────────────────────
 
-DATASET_EXTENSIONS = (".csv", ".ndjson", ".jsonl", ".json")
-_SAFE_DATASET_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
-
-
-def safe_dataset_name(filename: str) -> str | None:
-    """Nama berkas dataset yang aman, atau None bila tidak layak.
-
-    Menolak (bukan memotong) nama ber-separator, nama aneh, dan ekstensi di
-    luar daftar — sehingga unggahan tidak pernah dapat menulis ke luar
-    `storage/datasets/`.
-    """
-    name = filename or ""
-    if "/" in name or "\\" in name or name != Path(name).name:
-        return None
-    if name in ("", ".", "..") or not _SAFE_DATASET_NAME.match(name):
-        return None
-    if Path(name).suffix.lower() not in DATASET_EXTENSIONS:
-        return None
-    return name
-
-
 def _dataset_target_path(filename: str) -> Path:
     return Path(DATASETS_DIR) / filename
 
@@ -3869,6 +3847,15 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
         raise SubmissionError(
             f"Berkas `{Path(target).name}` sudah ada di storage/datasets/.",
             key="ap.err_file_exists", values={"filename": Path(target).name})
+    local = getattr(src, "local_path", None)
+    if local is not None:
+        # Hasil unggahan bertahap sudah utuh di disk, di filesystem yang sama
+        # (storage/): DIPINDAHKAN, bukan disalin — menyalin 20 GB berarti
+        # menunggu lama dan sesaat memakan dua kali ruang disk.
+        src.close()
+        Path(target).parent.mkdir(parents=True, exist_ok=True)
+        os.replace(local, target)
+        return Path(target).stat().st_size
     written, _truncated = copy_stream(src, target)
     return written
 
@@ -4036,15 +4023,31 @@ def _render_dataset_flow() -> None:
 def _render_dataset_upload_tab() -> None:
     limit_gb = MAX_DATASET_UPLOAD_BYTES / (1024 ** 3)
     may_upload = _render_upload_gate("dataset")
-    uploaded = st.file_uploader(
-        "Berkas dataset", type=["csv", "ndjson", "jsonl", "json"],
-        accept_multiple_files=False, key="contrib_dataset_file",
-        disabled=not may_upload,
-        help=f"Batas unggah {limit_gb:.0f} GB. Berkas yang lebih besar "
-             f"didaftarkan lewat tab Daftarkan dari server.",
-    )
+    if not may_upload:
+        # Gerbangnya sudah menjelaskan sebabnya; tanpa izin unggah tidak ada
+        # token unggah, jadi kontrolnya tidak digambar sama sekali.
+        return
+    # Unggahan BERTAHAP, bukan `st.file_uploader`: berkas dikirim per potongan
+    # 8 MB, dicoba ulang bila jaringan putus, dan dapat dilanjutkan — satu
+    # request 5 GB lewat VPS dan VPN gagal seluruhnya pada satu putus sesaat.
+    from ui.components.chunked_uploader import finish, render_chunked_uploader
+    uploaded = render_chunked_uploader(
+        current_user()["username"],
+        help_text=(f"Batas unggah {limit_gb:.0f} GB. Berkas yang lebih besar "
+                   f"didaftarkan lewat tab Daftarkan dari server. Jangan "
+                   f"tinggalkan halaman ini selama unggahan berjalan; bila "
+                   f"terputus, pilih berkas yang sama lagi untuk melanjutkan."))
     if uploaded is None:
         return
+
+    with st.container(border=True):
+        ganti = st.columns([3, 1])
+        ganti[0].markdown(f"`{uploaded.name}` · {format_size(uploaded.size)} · diterima utuh")
+        if ganti[1].button("Pilih berkas lain", key="contrib_chunk_discard",
+                           use_container_width=True):
+            finish(uploaded.token, delete_part=True)
+            st.session_state.pop(_DS_DIAG_KEY, None)
+            st.rerun()
 
     safe = safe_dataset_name(uploaded.name)
     if safe is None:
@@ -4061,10 +4064,6 @@ def _render_dataset_upload_tab() -> None:
                  f"server, lalu pakai tab **Daftarkan dari server**, tanpa "
                  f"batas ukuran dan tanpa penyalinan.")
         return
-
-    with st.container(border=True):
-        cols = st.columns(2)
-        cols[0].markdown(f"`{safe}` · {format_size(size)}")
 
     # 1. Diagnosa DULU — belum ada apa pun yang ditulis ke storage/datasets/.
     with st.spinner("Memeriksa dataset…"):
@@ -4118,6 +4117,12 @@ def _render_dataset_upload_tab() -> None:
         # penelusuran folder berikutnya dipaksa membaca ulang dari disk.
         from ui.views.run_experiment import invalidate_dataset_options
         invalidate_dataset_options()
+        # Berkasnya sudah pindah ke storage/datasets/: tutup unggahan ini
+        # supaya kontrolnya kembali siap untuk berkas berikutnya.
+        if getattr(uploaded, "token", None):
+            from ui.components.chunked_uploader import finish
+            finish(uploaded.token)
+            st.session_state.pop(_DS_DIAG_KEY, None)
         st.success(t("ap.msg_saved_as", filename=safe,
                             size=format_size(written)))
 

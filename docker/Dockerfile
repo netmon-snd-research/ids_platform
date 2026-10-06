@@ -34,9 +34,10 @@ RUN pip install -e . --no-build-isolation
 # metadata paket ke /app, dan folder storage dibuat di sini.
 RUN mkdir -p storage/datasets storage/artifacts && chown -R app:app /app
 # Streamlit config — disable telemetry, set server port.
-# maxUploadSize (MB) harus sejalan dengan MAX_DATASET_UPLOAD_BYTES di
-# ui/views/contribute.py; .streamlit/config.toml milik proyek (ikut ter-COPY di
-# atas) menimpa berkas ini, keduanya sengaja disetel sama.
+# maxUploadSize (MB) hanya membatasi `st.file_uploader` (berkas pipeline dan
+# dataset uji coba, paling besar 25 MB). Dataset besar tidak lewat sini lagi:
+# ia diunggah bertahap (orchestrator/chunked_upload.py). .streamlit/config.toml
+# milik proyek (ikut ter-COPY di atas) menimpa berkas ini; keduanya sama.
 #
 # Ditulis SELAGI ROOT dan ke SATU rumah yang dipakai kedua kemungkinan
 # pengguna. Menulisnya sesudah `USER` dengan HOME dipatok /root membuat build
@@ -44,7 +45,7 @@ RUN mkdir -p storage/datasets storage/artifacts && chown -R app:app /app
 # `--build-arg RUN_AS=app` benar-benar dicoba.
 ENV HOME=/home/app
 RUN mkdir -p "$HOME/.streamlit" \
-    && echo '[server]\nheadless = true\nport = 8501\nenableCORS = false\nenableXsrfProtection = false\nmaxUploadSize = 20480\n\n[browser]\ngatherUsageStats = false' > "$HOME/.streamlit/config.toml" \
+    && echo '[server]\nheadless = true\nport = 8501\nenableCORS = false\nenableXsrfProtection = false\nmaxUploadSize = 200\n\n[browser]\ngatherUsageStats = false' > "$HOME/.streamlit/config.toml" \
     && chown -R app:app "$HOME"
 
 # Pengguna yang menjalankan aplikasi. BAWAANNYA `root`, dan itu keputusan
@@ -69,4 +70,7 @@ USER ${RUN_AS}
 EXPOSE 8501
 
 # Initialize DB and start Streamlit
-CMD python -m database.migration && streamlit run ui/app.py
+# `ui/serve.py`, bukan `ui/app.py`: berkas itu membungkus aplikasi yang sama
+# dalam `st.App` supaya rute unggahan bertahap (/ids-upload) ikut dilayani di
+# port 8501 yang sama. Halaman-halamannya tetap ui/app.py.
+CMD python -m database.migration && streamlit run ui/serve.py

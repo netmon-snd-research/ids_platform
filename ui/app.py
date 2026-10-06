@@ -78,13 +78,15 @@ def _startup_cleanup():
     Tiap pembersihan berdiri sendiri: yang gagal tidak menghalangi yang lain,
     dan tidak satu pun boleh menjatuhkan aplikasi yang baru mau menyala.
     """
+    from orchestrator.chunked_upload import cleanup_stale_parts
     from orchestrator.experiment_service import cleanup_stale_experiments
     from orchestrator.trial_dataset_service import purge_orphans
     from orchestrator.trial_service import cleanup_stale_trials
 
     for nama, sapu in (("eksperimen tersangkut", cleanup_stale_experiments),
                        ("uji coba tersangkut", cleanup_stale_trials),
-                       ("lampiran yatim", purge_orphans)):
+                       ("lampiran yatim", purge_orphans),
+                       ("unggahan bertahap yang ditinggalkan", cleanup_stale_parts)):
         try:
             jumlah = sapu()
         except Exception:
