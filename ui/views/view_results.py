@@ -356,6 +356,17 @@ GRID_CSS = {
         "font-size": "13px !important",
         "display": "flex !important",
         "align-items": "center !important",
+        # `display: flex` mematikan pemotongan teks bawaan AgGrid: teks yang
+        # lebih panjang dari kolomnya meluber MENINDIH sel sebelah (di HP
+        # tanggal dan nama pipeline tergambar bertumpuk). Selnya memotong,
+        # isinya berakhir dengan "…".
+        "overflow": "hidden !important",
+    },
+    ".ag-cell-wrapper, .ag-cell-value": {
+        "min-width": "0",
+        "overflow": "hidden",
+        "text-overflow": "ellipsis",
+        "white-space": "nowrap",
     },
     ".ag-header-cell": {"border-right": "none !important"},
     ".ag-row": {
@@ -399,6 +410,11 @@ def _grid_dataframe(rows: list[dict], columns: list[dict]) -> pd.DataFrame:
 _COLUMN_WIDTHS = {"pipeline": 210, "berkas": 200, "waktu": 150,
                   "dataset_hash": 130, "dataset": 130, "pemilik": 120}
 
+#: Lebar minimum kolom metrik ("0.8607" + ikon urut) dan tambahan untuk kotak
+#: centang yang menumpang di kolom pertama.
+_METRIC_MIN_W = 88
+_CHECKBOX_W = 36
+
 
 def _build_grid_options(df: pd.DataFrame, columns: list[dict],
                         metric_tooltip: str = "") -> dict:
@@ -421,8 +437,15 @@ def _build_grid_options(df: pd.DataFrame, columns: list[dict],
             continue
         children = []
         for col in cols:
+            width = _COLUMN_WIDTHS.get(col["key"], 120)
             spec = {"headerName": col["label"], "field": col["label"],
-                    "width": _COLUMN_WIDTHS.get(col["key"], 120),
+                    "width": width,
+                    # Lantai lebar. Di HP grid memeras kolom sampai jauh lebih
+                    # sempit dari isinya; dengan lantai ini kolom berhenti
+                    # menyusut dan tabelnya DIGESER mendatar. Di desktop lebar
+                    # kolom sudah di atas lantai, jadi tidak ada yang berubah.
+                    "minWidth": (_METRIC_MIN_W if col["kind"] == et.KIND_METRIC
+                                 else width) + (_CHECKBOX_W if first_column else 0),
                     # Nama pipeline dan dataset kontribusi lebih panjang
                     # daripada kolomnya. Tanpa ini yang terbaca hanya
                     # "uploaded.deteksi_trafik_kampus_dumm" dan sisanya

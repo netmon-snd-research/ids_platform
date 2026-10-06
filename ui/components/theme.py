@@ -767,6 +767,28 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     border-color: rgba(127,127,127,.35);
     font-weight: {WEIGHT_NORMAL};
 }}
+/* …kecuali di layar sempit: kedua tombol tetap BERDAMPINGAN, berbagi lebar
+   sama rata, dan kolom penyangga ketiga disembunyikan. Dua tombol pendek
+   yang ditumpuk hanya memakan tinggi tanpa menambah keterbacaan. Barisnya
+   dikenali dari tombol "Siapkan Eksperimen" di dalamnya, jadi tidak perlu
+   penanda tambahan. Lebih khusus daripada aturan menumpuk umum, jadi menang
+   di mana pun letaknya. */
+@container (max-width: {STACK_WIDTH}) {{
+    [data-testid="{COL_ROW}"]:has([class*="st-key-cat_run_"]) > [data-testid="{COL_ONE}"] {{
+        flex: 1 1 0; min-width: 0; width: auto;
+    }}
+    [data-testid="{COL_ROW}"]:has([class*="st-key-cat_run_"]) > [data-testid="{COL_ONE}"]:nth-child(3) {{
+        display: none;
+    }}
+}}
+@media (max-width: {STACK_WIDTH}) {{
+    [data-testid="{COL_ROW}"]:has([class*="st-key-cat_run_"]) > [data-testid="{COL_ONE}"] {{
+        flex: 1 1 0; min-width: 0; width: auto;
+    }}
+    [data-testid="{COL_ROW}"]:has([class*="st-key-cat_run_"]) > [data-testid="{COL_ONE}"]:nth-child(3) {{
+        display: none;
+    }}
+}}
 
 /* ── Pemilih mode: daftar mengembang DI DALAM sidebar ──────────────────
    Bukan lapisan mengambang lagi, jadi tidak ada yang bisa menimpa konten.
