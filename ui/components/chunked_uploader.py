@@ -141,40 +141,68 @@ def render_chunked_uploader(username: str) -> ChunkedFile | None:
 # kontrolnya mengikuti tema terang maupun gelap yang sedang dipakai aplikasi.
 _WIDGET_HTML = r"""
 <style>
+  /* Warna BERMAKNA, masing-masing sebagai triplet rgb supaya latar bernada
+     tipisnya dapat diturunkan: aksen = sedang mengunggah, ok = diterima utuh,
+     warn = koneksi terganggu dan sedang dicoba lagi, err = gagal/ditolak;
+     csv/json = jenis berkas. Nilai terang di sini, nilai gelap disetel
+     applyTheme() saat halaman induk bertema gelap. */
   :root { --bg:#ffffff; --panel:#f0f2f6; --fg:#31333f; --muted:rgba(49,51,63,.6);
-          --line:rgba(49,51,63,.2); --accent:#ff4b4b; --err:#e5484d; }
+          --line:rgba(49,51,63,.2);
+          --acc:255,75,75; --ok:21,128,61; --warn:180,83,9; --err:220,38,38;
+          --csv:13,148,136; --json:37,99,235; }
   * { box-sizing: border-box; }
+  /* `hidden` HARUS menang atas `display` milik kelas mana pun: tanpa ini
+     baris berkas yang kosong ikut tergambar sebelum berkas dipilih. */
+  [hidden] { display: none !important; }
   html, body { margin: 0; background: transparent; color: var(--fg);
                font-family: var(--font, "Source Sans Pro", "Source Sans 3", system-ui, sans-serif); }
   .zone { background: var(--panel); border-radius: 8px; padding: 16px;
           display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
           border: 1px dashed transparent; transition: border-color .15s; }
-  .zone.over { border-color: var(--accent); }
+  .zone:hover:not(.off), .zone.over { border-color: rgb(var(--acc)); background: rgba(var(--acc),.06); }
   .zone.off { opacity: .55; }
   button.up { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
               background: var(--bg); color: var(--fg); border: 1px solid var(--line);
               border-radius: 8px; padding: 7px 14px; font: inherit; font-size: 15px; }
-  button.up:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-  button.up:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.up:hover:not(:disabled) { border-color: rgb(var(--acc)); color: rgb(var(--acc)); }
+  button.up:focus-visible { outline: 2px solid rgb(var(--acc)); outline-offset: 2px; }
   button.up:disabled { cursor: not-allowed; }
   .hint { font-size: 14px; color: var(--muted); }
   input[type=file] { display: none; }
-  .file { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px;
-          align-items: center; padding: 12px 4px 4px; }
-  .icon { width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center;
-          background: var(--panel); color: var(--muted); }
-  .file.err .icon { color: var(--err); }
-  .name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
-  .file.err .meta { color: var(--err); }
+  /* Baris berkas: latar bernada tipis menurut KEADAANNYA, jadi keadaan terbaca
+     sekilas sebelum teksnya dibaca. --st adalah warna keadaan aktif. */
+  /* Sedang mengunggah = NETRAL (hanya bilahnya yang beraksen), sebab merah
+     juga berarti gagal: baris yang normal tidak boleh terlihat seperti error.
+     Latar bernada hanya untuk keadaan yang perlu diperhatikan. */
+  .file { --st: var(--acc); display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px;
+          align-items: center; margin-top: 10px; padding: 10px 8px 10px 10px; border-radius: 8px;
+          background: transparent; border: 1px solid var(--line);
+          transition: background .3s, border-color .3s; }
+  .file.ok, .file.warn, .file.err { background: rgba(var(--st),.08); border-color: rgba(var(--st),.28); }
+  .file.ok { --st: var(--ok); }
+  .file.warn { --st: var(--warn); }
+  .file.err { --st: var(--err); }
+  /* Lencana jenis berkas: CSV dan keluarga JSON dibedakan warna dan teksnya. */
+  .badge { --t: var(--json); width: 42px; height: 36px; border-radius: 6px; display: grid;
+           place-items: center; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+           color: rgb(var(--t)); background: rgba(var(--t),.14); border: 1px solid rgba(var(--t),.28); }
+  .badge.csv { --t: var(--csv); }
+  .name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .file.ok .meta, .file.warn .meta, .file.err .meta { color: rgb(var(--st)); font-weight: 600; }
   .x { background: none; border: none; cursor: pointer; color: var(--muted);
        width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; }
-  .x:hover { color: var(--err); background: var(--panel); }
-  .x:focus-visible { outline: 2px solid var(--accent); }
-  .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--panel);
+  .x:hover { color: rgb(var(--err)); background: rgba(var(--err),.12); }
+  .x:focus-visible { outline: 2px solid rgb(var(--acc)); }
+  .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(var(--st),.15);
          overflow: hidden; margin-top: 6px; }
-  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
-  @media (prefers-reduced-motion: reduce) { .bar > div, .zone { transition: none; } }
+  .bar > div { height: 100%; width: 0; background: rgb(var(--st)); transition: width .3s, background .3s; }
+  /* Mencoba lagi: bilahnya berdenyut pelan — sedang menunggu, bukan macet. */
+  .file.warn .bar > div { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) {
+    .bar > div, .zone, .file { transition: none; }
+    .file.warn .bar > div { animation: none; } }
 </style>
 <div class="zone" id="zone">
   <button class="up" id="pick" type="button">
@@ -187,10 +215,7 @@ _WIDGET_HTML = r"""
   <input id="f" type="file">
 </div>
 <div class="file" id="row" hidden>
-  <div class="icon" aria-hidden="true">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
-  </div>
+  <div class="badge" id="badge" aria-hidden="true"></div>
   <div style="min-width:0"><div class="name" id="name"></div><div class="meta" id="meta"></div></div>
   <button class="x" id="cancel" type="button">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -229,6 +254,13 @@ function applyTheme() {
     r.setProperty("--panel", panel && panel.join() !== bg.join() ? `rgb(${panel})`
                                : (dark ? "#262730" : "#f0f2f6"));
     r.setProperty("--font", cs.fontFamily);
+    // Versi gelap warna bermakna: lebih terang supaya tetap kontras.
+    const tones = dark
+      ? { "--ok": "74,222,128", "--warn": "251,191,36", "--err": "248,113,113",
+          "--csv": "45,212,191", "--json": "96,165,250" }
+      : { "--ok": "21,128,61", "--warn": "180,83,9", "--err": "220,38,38",
+          "--csv": "13,148,136", "--json": "37,99,235" };
+    for (const [k, v] of Object.entries(tones)) r.setProperty(k, v);
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
   } catch (_) { /* tetap memakai warna bawaan */ }
 }
@@ -248,9 +280,16 @@ $("f").accept = C.accept;
 $("cancel").title = L.cancel;
 $("cancel").setAttribute("aria-label", L.cancel);
 
+// Keadaan baris: "up" (sedang mengunggah), "warn" (mencoba lagi),
+// "ok" (diterima utuh), "err" (gagal/ditolak).
 function row(name, meta, opts = {}) {
+  const state = opts.state || (opts.error ? "err" : "up");
+  const ext = (name.split(".").pop() || "").toUpperCase().slice(0, 6);
   $("row").hidden = false;
-  $("row").className = "file" + (opts.error ? " err" : "");
+  $("row").className = "file " + state;
+  $("badge").textContent = ext;
+  $("badge").className = "badge" + (ext === "CSV" ? " csv" : "");
+  if (state === "ok") meta = "✓ " + meta;
   $("name").textContent = name;
   $("name").title = name;
   $("meta").textContent = meta;
@@ -352,14 +391,14 @@ async function upload(file) {
         fails++;
         const wait = Math.min(30000, 1000 * 2 ** Math.min(fails, 5));
         row(file.name, fmt(L.retry, { sec: Math.round(wait / 1000), safe: size(received) }),
-            { pct: received / file.size * 100 });
+            { pct: received / file.size * 100, state: "warn" });
         await sleep(wait);
         try { const s = await api("/" + C.token, {}); if (s.status === 200) received = s.body.received; } catch (_) {}
         continue;
       }
       show(received);
     }
-    row(file.name, size(file.size) + " · " + L.done, { pct: 100 });
+    row(file.name, size(file.size) + " · " + L.done, { pct: 100, state: "ok" });
     // Halaman memuat ulang sendiri begitu server melihat berkasnya lengkap.
   } catch (e) {
     if (!cancelled) {
@@ -395,7 +434,7 @@ window.addEventListener("error", (e) => row($("name").textContent || "-", "JS: "
 
 // Keadaan awal: berkas yang sudah lengkap tetap tampil sebagai baris.
 if (C.done) {
-  row(C.done.name, size(C.done.size) + " · " + L.received, { pct: 100 });
+  row(C.done.name, size(C.done.size) + " · " + L.received, { pct: 100, state: "ok" });
   lockZone(true);
 }
 fit();
