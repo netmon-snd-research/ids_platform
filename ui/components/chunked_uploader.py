@@ -162,13 +162,51 @@ async function api(path, opts) {
   return { status: res.status, body };
 }
 
+// Galat apa pun TAMPIL, bukan diam: kontrol yang tidak bereaksi tanpa pesan
+// tidak dapat dibedakan dari unggahan yang sedang berjalan.
+window.addEventListener("error", (e) => say("Kesalahan di peramban: " + e.message, true));
+window.addEventListener("unhandledrejection", (e) => say("Unggahan berhenti: " + (e.reason && e.reason.message || e.reason), true));
+
+// PUT satu potongan lewat XHR, bukan fetch: hanya XHR yang melaporkan
+// kemajuan unggah di DALAM satu potongan, sehingga bilah progres bergerak
+// sejak byte pertama alih-alih diam sampai 8 MB pertama selesai.
+function putChunk(url, blob, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", url);
+    x.timeout = 180000;
+    x.upload.onprogress = (ev) => { if (ev.lengthComputable) onProgress(ev.loaded); };
+    x.onload = () => {
+      let body = {};
+      try { body = JSON.parse(x.responseText); } catch (_) {}
+      resolve({ status: x.status, body });
+    };
+    x.onerror = () => reject(new Error("jaringan"));
+    x.ontimeout = () => reject(new Error("batas waktu"));
+    x.send(blob);
+  });
+}
+
 let running = false;
 $("f").addEventListener("change", async () => {
   const file = $("f").files[0];
   if (!file || running) return;
-  if (file.size > C.max) { say("Berkas melebihi " + GB(C.max) + ".", true); return; }
+  if (file.size > C.max) { say(file.name + " (" + GB(file.size) + ") melebihi batas " + GB(C.max) + ".", true); return; }
   running = true;
   $("bar").hidden = false;
+  $("fill").style.width = "0%";
+  say(file.name + " · " + GB(file.size) + " — menghubungi server…");
+  let t0 = Date.now(), base = 0;
+  const show = (sent) => {
+    const pct = sent / file.size * 100;
+    const secs = (Date.now() - t0) / 1000;
+    const rate = secs > 1 ? (sent - base) / secs : 0;
+    const eta = rate > 0 ? Math.round((file.size - sent) / rate / 60) : null;
+    $("fill").style.width = pct.toFixed(1) + "%";
+    say(file.name + " · " + GB(sent) + " / " + GB(file.size) + " (" + pct.toFixed(1) + "%)"
+        + (rate > 0 ? " · " + (rate / 1024 ** 2).toFixed(1) + " MB/dtk" : "")
+        + (eta !== null ? " · sisa ±" + eta + " menit" : ""));
+  };
   try {
     // Mulai — atau lanjutkan berkas parsial yang sudah ada di server.
     let r;
@@ -180,16 +218,19 @@ $("f").addEventListener("change", async () => {
       catch (e) { say("Menghubungi server… (percobaan " + (i + 1) + ")"); await sleep(Math.min(30000, 1000 * 2 ** i)); }
     }
     if (r.status !== 200) { say(r.body.error || ("Ditolak server (" + r.status + ")."), true); return; }
-    let received = r.body.received, fails = 0, t0 = Date.now(), base = received;
+    let received = r.body.received, fails = 0;
+    base = received; t0 = Date.now();
+    if (received > 0) say("Melanjutkan dari " + GB(received) + "…");
+    show(received);
     while (received < file.size) {
       const end = Math.min(received + C.chunk, file.size);
       try {
-        const res = await api("/" + C.token + "/chunk?offset=" + received,
-                              { method: "PUT", body: file.slice(received, end) });
-        if (res.status === 200 || res.status === 409) {
-          if (typeof res.body.received === "number") received = res.body.received;
+        const at = received;
+        const res = await putChunk(C.prefix + "/" + C.token + "/chunk?offset=" + at,
+                                   file.slice(at, end), (loaded) => show(at + loaded));
+        if (res.status === 200 || (res.status === 409 && typeof res.body.received === "number")) {
+          received = res.body.received;
           if (res.status === 200) fails = 0;
-          if (res.status === 409 && typeof res.body.received !== "number") throw new Error(res.body.error);
         } else if (res.status === 403) {
           say((res.body.error || "Sesi unggah berakhir.") + " Muat ulang halaman, lalu pilih berkas yang sama untuk melanjutkan.", true);
           return;
@@ -201,23 +242,18 @@ $("f").addEventListener("change", async () => {
         // Jaringan putus / server sibuk: tunggu, tanyakan posisi terakhir, ulangi.
         fails++;
         const wait = Math.min(30000, 1000 * 2 ** Math.min(fails, 5));
-        say("Koneksi terganggu, mencoba lagi dalam " + Math.round(wait / 1000)
-            + " detik… (" + GB(received) + " sudah aman di server)");
+        say("Koneksi terganggu (" + e.message + "), mencoba lagi dalam " + Math.round(wait / 1000)
+            + " detik… " + GB(received) + " sudah aman di server.");
         await sleep(wait);
         try { const s = await api("/" + C.token, {}); if (s.status === 200) received = s.body.received; } catch (_) {}
         continue;
       }
-      const pct = received / file.size * 100;
-      const secs = (Date.now() - t0) / 1000;
-      const rate = secs > 0 ? (received - base) / secs : 0;
-      const eta = rate > 0 ? Math.round((file.size - received) / rate / 60) : null;
-      $("fill").style.width = pct.toFixed(1) + "%";
-      say(file.name + " · " + GB(received) + " / " + GB(file.size) + " (" + pct.toFixed(1) + "%)"
-          + (rate > 0 ? " · " + (rate / 1024 ** 2).toFixed(1) + " MB/dtk" : "")
-          + (eta !== null ? " · sisa ±" + eta + " menit" : ""));
+      show(received);
     }
     $("fill").style.width = "100%";
-    say("Selesai diunggah. Memeriksa berkas…");
+    say(file.name + " selesai diunggah. Memeriksa berkas…");
+  } catch (e) {
+    say("Unggahan berhenti: " + e.message + ". Pilih berkas yang sama untuk melanjutkan.", true);
   } finally { running = false; }
 });
 </script>
