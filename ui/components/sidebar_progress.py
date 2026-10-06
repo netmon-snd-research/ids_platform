@@ -213,7 +213,11 @@ def _status_reader():
 def load_progress_view() -> dict:
     """Baca DB + kesehatan, lalu susun tampilannya. Tidak pernah melempar."""
     try:
-        rows = _inflight_rows()
+        # `_inflight_rows` di-cache BERSAMA untuk semua sesi; penyaringan per
+        # penonton (device/akun) dilakukan sesudahnya, jadi cache-nya tidak
+        # pernah menyimpan tampilan milik satu orang.
+        from ui.components.device import visible_to_viewer
+        rows = visible_to_viewer(_inflight_rows())
     except Exception:
         logger.debug("Daftar eksperimen berjalan tidak terbaca", exc_info=True)
         return {"rows": [], "extra": 0, "total": 0, "degraded": True,

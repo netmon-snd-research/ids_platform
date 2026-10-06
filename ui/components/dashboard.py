@@ -28,6 +28,36 @@ def _epoch(iso) -> float:
         return 0.0
 
 
+def visible_runs(experiments, *, device_id: str | None = None,
+                 username: str | None = None, sees_all: bool = False) -> list:
+    """Saring eksperimen yang boleh dilihat penonton ini. Pure.
+
+    Run yang SUDAH selesai (FINISHED, FAILED, …) selalu tampil: hasilnya adalah
+    catatan penelitian bersama. Run yang masih mengantre atau berjalan hanya
+    tampil bila penontonnya:
+
+    * memulainya dari device (browser) yang sama — ``device_id`` cocok;
+    * masuk dengan akun yang memulainya — ``username`` cocok dengan ``owner``;
+    * Research Admin (``sees_all``), yang perlu melihat semua run untuk
+      membatalkan yang macet.
+
+    Run lama tanpa ``device_id`` dan tanpa ``owner`` karena itu hanya terlihat
+    oleh Research Admin selama masih tercatat berjalan.
+    """
+    rows = list(experiments or [])
+    if sees_all:
+        return rows
+    out = []
+    for e in rows:
+        if e.get("status") not in _RUNNING_ORDER:
+            out.append(e)
+        elif device_id and e.get("device_id") == device_id:
+            out.append(e)
+        elif username and e.get("owner") == username:
+            out.append(e)
+    return out
+
+
 def select_running(experiments) -> list:
     """Return the in-flight experiments (RUNNING then QUEUED), newest-created
     first. Pure — safe to unit-test. Non-in-flight statuses are excluded."""

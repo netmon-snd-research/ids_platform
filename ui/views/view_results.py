@@ -32,6 +32,7 @@ from ui.components import experiment_table as et
 from ui.components import tables as tbl
 from ui.components.sections import prose
 from ui.components.page_flags import wait_before_refresh
+from ui.components.device import viewer_identity, visible_to_viewer
 
 # Nama halaman ini di menu ui/app.py. Dipakai mengikat pembaruan
 # berkala pada halamannya: begitu pengguna pindah, penggambaran
@@ -1127,7 +1128,7 @@ def _detail_dialog_body(experiment_id: str) -> None:
             dlg.clear_payload(dlg.DETAIL_KEY)
             st.rerun()
     if act[1].button(t("ps.btn_rerun"), key=f"dlg_rerun_{exp['id']}"):
-        r = rerun_experiment(exp["id"])
+        r = rerun_experiment(exp["id"], **viewer_identity())
         if r.get("success"):
             st.success(t("ps.msg_rerun_started",
                          id=r["experiment_id"][:8]))
@@ -1171,7 +1172,7 @@ def _render_selected_actions(selected_id: str, cols=None) -> None:
         dlg.open_dialog(dlg.DETAIL_KEY, selected_id)
         st.rerun()
     if cols[1].button(t("ps.btn_rerun"), key=f"rerun_{selected_id}", use_container_width=True):
-        r = rerun_experiment(selected_id)
+        r = rerun_experiment(selected_id, **viewer_identity())
         if r.get("success"):
             st.success(t("ps.msg_rerun_refresh",
                          id=r["experiment_id"][:8]))
@@ -1350,9 +1351,13 @@ def render():
                 unsafe_allow_html=True)
     st.title(t("page.progress"))
 
-    experiments = list_all_experiments()
+    # Run yang masih mengantre/berjalan milik device atau akun LAIN disaring di
+    # sini, sekali, sehingga bagian Sedang Berjalan, tabel riwayat, dan dialog
+    # perbandingan sama-sama tidak memperlihatkannya. Hasil yang sudah selesai
+    # tetap tampil bagi semua.
+    experiments = visible_to_viewer(list_all_experiments())
 
-    # -- Sedang Berjalan (live dashboard of ALL in-flight experiments) --
+    # -- Sedang Berjalan (in-flight experiments milik penonton ini) --
     running, auto, interval = _render_running_section(experiments)
 
     st.markdown("---")

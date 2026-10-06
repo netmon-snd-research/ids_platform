@@ -74,13 +74,19 @@ def create_experiment(
     run_mode: str | None = None,
     params_used: str | None = None,
     params_changed: int | None = None,
+    device_id: str | None = None,
 ) -> None:
     """Insert new experiment with status QUEUED.
 
     ``owner`` adalah username pencatat, atau None bila eksperimen dijalankan
     tanpa login (mode pengunjung). NULL diperlakukan sebagai "eksperimen
-    sistem" — sama seperti record lama sebelum autentikasi ada — dan TIDAK
-    pernah dipakai untuk menyaring tampilan.
+    sistem" — sama seperti record lama sebelum autentikasi ada.
+
+    ``device_id`` adalah pengenal acak browser yang memulai run (cookie, lihat
+    ui/components/device.py), atau None. Bersama ``owner`` ia hanya dipakai
+    untuk satu hal: run yang masih mengantre/berjalan ditampilkan ke device
+    dan akun pemiliknya saja. Hasil yang sudah selesai tetap terbuka bagi
+    semua.
 
     ``pipeline_version``/``pipeline_hash`` hanya terisi untuk pipeline
     TERUNGGAH; pipeline bawaan membiarkannya NULL karena definisinya ada di git.
@@ -95,12 +101,12 @@ def create_experiment(
         conn.execute(
             """INSERT INTO experiments (id, dataset_type, dataset_path, dataset_hash,
                pipeline_id, status, created_at, owner, pipeline_version, pipeline_hash,
-               run_mode, params_used, params_changed)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               run_mode, params_used, params_changed, device_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (experiment_id, dataset_type, dataset_path, dataset_hash,
              pipeline_id, STATUS_QUEUED, created_at, owner,
              pipeline_version, pipeline_hash,
-             run_mode, params_used, params_changed),
+             run_mode, params_used, params_changed, device_id),
         )
         conn.commit()
     finally:

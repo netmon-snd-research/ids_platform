@@ -360,6 +360,21 @@ MIGRATIONS = [
         "sql": "ALTER TABLE registered_pipelines ADD COLUMN package_json TEXT",
         "add_column": ("registered_pipelines", "package_json"),
     },
+    {
+        # Device (browser) yang memulai run. Run yang masih mengantre atau
+        # berjalan hanya ditampilkan ke device ini, ke pemilik akunnya, dan
+        # ke Research Admin (lihat ui/components/dashboard.visible_runs).
+        # Pengunjung tanpa akun semuanya ber-`owner` NULL, jadi tanpa kolom
+        # ini mereka tidak dapat dibedakan satu sama lain.
+        #
+        # Aditif dan NULLABLE: run lama tidak punya catatannya. Run lama yang
+        # masih tercatat berjalan tanpa device hanya terlihat oleh pemilik
+        # akunnya dan Research Admin.
+        "version": 35,
+        "description": "Add nullable device_id to experiments",
+        "sql": "ALTER TABLE experiments ADD COLUMN device_id TEXT",
+        "add_column": ("experiments", "device_id"),
+    },
 ]
 
 CREATE_SCHEMA_VERSION_TABLE = """

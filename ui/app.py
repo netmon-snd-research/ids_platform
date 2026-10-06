@@ -146,6 +146,7 @@ from ui.components import theme
 from ui.components.sidebar_progress import render_sidebar_progress
 from ui.components.sidebar_chrome import menu_styles, render_breadcrumb
 from ui.components.page_flags import drop_stale_page_flags
+from ui.components.device import render_device_cookie
 from ui.i18n import t
 
 # Gaya bersama seluruh aplikasi — didefinisikan sekali di
@@ -289,6 +290,12 @@ render_sidebar_progress()
 # tombol Keluar. Berpindah identitas tidak menyentuh data maupun state
 # eksperimen yang sedang berjalan.
 render_mode_switch()
+
+# Cookie pengenal device: hanya digambar pada sesi yang baru saja membuat
+# pengenalnya. Paling bawah di sidebar karena komponennya setinggi 0 dan tidak
+# boleh menggeser apa pun (lihat ui/components/device.py).
+with st.sidebar:
+    render_device_cookie()
 
 # Modal masuk/daftar dipanggil dari ALUR UTAMA — di luar blok `with st.sidebar`
 # dan bukan dari callback, sesuai pola dialog yang sudah bekerja di halaman

@@ -32,6 +32,7 @@ from typing import Optional
 
 import streamlit as st
 
+from ui.components.device import device_id as _device_id
 from ui.i18n import t
 from workers.heartbeat import (
     LIVE_QUIET, LIVE_SILENT, classify_liveness,
@@ -195,6 +196,10 @@ def _rerun(status_data: dict, user: Optional[dict]) -> Optional[str]:
         owner=status_data.get("owner"),
         run_mode=status_data.get("run_mode"),
         param_overrides=overrides or None,
+        # Mengulang run yang macet adalah memulihkan run orang yang SAMA, jadi
+        # device aslinya dipertahankan; device penekan hanya cadangan untuk
+        # run lama yang belum punya catatan device.
+        device_id=status_data.get("device_id") or _device_id(),
     )
     if not result.get("success"):
         return result.get("error") or result.get("message") or "?"

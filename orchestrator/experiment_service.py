@@ -168,6 +168,7 @@ def create_and_run_experiment(
     owner: str | None = None,
     run_mode: str | None = None,
     param_overrides: dict | None = None,
+    device_id: str | None = None,
 ) -> dict:
     """
     Create and execute an experiment.
@@ -181,9 +182,12 @@ def create_and_run_experiment(
     metadata artefak, untuk kedua mode.
 
     ``owner`` (opsional, default None) hanyalah METADATA pencatatan: username
-    pengguna yang sedang masuk, atau None bila dijalankan tanpa login. Nilainya
-    TIDAK diteruskan ke worker maupun ke pipeline — jalur komputasi tidak
-    mengetahuinya — dan tidak pernah dipakai untuk menyaring tampilan.
+    pengguna yang sedang masuk, atau None bila dijalankan tanpa login.
+    ``device_id`` (opsional) adalah pengenal acak browser yang memulainya.
+    Keduanya TIDAK diteruskan ke worker maupun ke pipeline — jalur komputasi
+    tidak mengetahuinya. Satu-satunya pemakaiannya di tampilan: run yang masih
+    mengantre/berjalan hanya terlihat oleh device dan akun pemiliknya
+    (``ui/components/dashboard.visible_runs``).
 
     If USE_ASYNC is True:
       - Creates DB record (QUEUED)
@@ -283,6 +287,7 @@ def create_and_run_experiment(
             pipeline_id=pipeline_id,
             created_at=now_iso(),
             owner=owner,
+            device_id=device_id,
             run_mode=resolved_mode,
             params_used=dump_params(effective_params),
             params_changed=1 if resolved["changed"] else 0,
@@ -724,8 +729,13 @@ def cancel_experiment(experiment_id: str) -> dict:
     }
 
 
-def rerun_experiment(experiment_id: str) -> dict:
-    """Re-execute with same config. Returns new experiment result."""
+def rerun_experiment(experiment_id: str, *, owner: str | None = None,
+                     device_id: str | None = None) -> dict:
+    """Re-execute with same config. Returns new experiment result.
+
+    ``owner``/``device_id`` milik orang yang MENEKAN ulang, bukan pemilik run
+    aslinya: run baru itu miliknya, jadi progresnya tampil di device-nya.
+    """
     original = get_experiment(experiment_id)
     if original is None:
         return {
@@ -754,8 +764,10 @@ def rerun_experiment(experiment_id: str) -> dict:
         dataset_type=original["dataset_type"],
         dataset_path=original["dataset_path"],
         pipeline_id=original["pipeline_id"],
+        owner=owner,
         run_mode=mode,
         param_overrides=overrides,
+        device_id=device_id,
     )
 
 

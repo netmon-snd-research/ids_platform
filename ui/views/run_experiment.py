@@ -3141,19 +3141,19 @@ def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
             st.write("Pipeline dijalankan; metrik dan artefak muncul setelah selesai.")
         st.info(t("re.msg_log_later"))
 
-        # Owner = username bila ada yang masuk, None bila mode pengunjung.
-        # Murni metadata pencatatan: tidak diteruskan ke worker/pipeline dan
-        # tidak pernah dipakai untuk menyaring tampilan.
-        from ui.views.login import current_user as _current_user
-        _user = _current_user()
+        # Owner = username bila ada yang masuk, None bila mode pengunjung;
+        # device_id = pengenal browser ini. Keduanya tidak diteruskan ke
+        # worker/pipeline; dipakai hanya agar run yang sedang berjalan tampil
+        # di device dan akun pemiliknya saja (ui/components/device.py).
+        from ui.components.device import viewer_identity
         # run_mode None = run RESMI (bawaan orchestrator). param_overrides
         # dibuang orchestrator pada run resmi, jadi tidak ada jalur di sini yang
         # bisa menyelinapkan nilai yang diubah ke dalam run resmi.
         result = create_and_run_experiment(
             dataset_type, dataset_path, pipeline_id,
-            owner=(_user or {}).get("username"),
             run_mode=run_mode,
             param_overrides=param_overrides,
+            **viewer_identity(),
         )
 
         if not result["success"]:
