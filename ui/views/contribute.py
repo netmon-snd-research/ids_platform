@@ -2585,6 +2585,24 @@ def _render_users_flow() -> None:
         for kol, kunci in zip(kepala, _USER_HEADERS):
             kol.markdown(f"**{t(kunci)}**" if kunci else "")
 
+    # Label sel untuk tampilan KARTU di layar sempit (aturannya di theme.py,
+    # "Tabel pengguna di layar sempit"). Di sana judul kolom disembunyikan,
+    # jadi Instansi / Dibuat / Diaktifkan membawa labelnya sendiri. Teksnya
+    # mengikuti bahasa aktif, karena itu disuntikkan di sini, bukan ditulis
+    # mati di stylesheet.
+    def _css_label(key: str) -> str:
+        teks = t(key).replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{teks}: "'
+
+    st.markdown(
+        "<style>:root{"
+        f"--ids-u-inst:{_css_label('ap.users_col_institution')};"
+        f"--ids-u-created:{_css_label('ap.users_col_created')};"
+        f"--ids-u-activated:{_css_label('ap.users_col_activated')};"
+        "}</style>",
+        unsafe_allow_html=True,
+    )
+
     for row in users:
         with st.container(border=True):
             # Jangkar perapat baris; aturannya tinggal di theme.py.

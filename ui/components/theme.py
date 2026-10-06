@@ -767,6 +767,60 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     border-color: rgba(127,127,127,.35);
     font-weight: {WEIGHT_NORMAL};
 }}
+/* ── Tabel pengguna di layar sempit: KARTU per akun ────────────────────
+   Tujuh kolom yang ditumpuk satu per baris membuat judul kolom menjadi tujuh
+   baris yang tidak menunjuk ke apa pun, dan setiap akun setinggi satu layar.
+   Di layar sempit: judul kolom disembunyikan; tiap baris menjadi kartu —
+   nama di atas, pil Peran + Status berdampingan, lalu Instansi / Dibuat /
+   Diaktifkan masing-masing DENGAN labelnya (dua tanggal tanpa label tidak
+   dapat dibedakan), lalu tombol aksi berdampingan. Teks label mengikuti
+   bahasa aktif, jadi disuntikkan halaman kelola pengguna sebagai variabel
+   `--ids-u-*` (ui/views/contribute.py). Desktop tidak tersentuh. */
+@container (max-width: {STACK_WIDTH}) {{
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-head) {{
+        display: none;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"]) {{
+        flex-wrap: wrap; row-gap: .35rem; column-gap: .6rem;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"] {{
+        flex: 1 1 100%; min-width: 0; width: auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:is(:nth-child(2), :nth-child(3)) {{
+        flex: 0 0 auto;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:is(:nth-child(4), :nth-child(5), :nth-child(6)) {{
+        font-size: .85rem;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:nth-child(4) [data-testid="stMarkdownContainer"] p::before {{
+        content: var(--ids-u-inst, ""); opacity: .65;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:nth-child(5) [data-testid="stMarkdownContainer"] p::before {{
+        content: var(--ids-u-created, ""); opacity: .65;
+    }}
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ROW}"]:not([data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"])
+        > [data-testid="{COL_ONE}"]:nth-child(6) [data-testid="stMarkdownContainer"] p::before {{
+        content: var(--ids-u-activated, ""); opacity: .65;
+    }}
+    /* Tombol utama + panel Aksi di kolom terakhir: berdampingan. */
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-user-row)
+        [data-testid="{COL_ONE}"] [data-testid="{COL_ROW}"] > [data-testid="{COL_ONE}"] {{
+        flex: 1 1 0; min-width: 0; width: auto;
+    }}
+}}
+
 /* …kecuali di layar sempit: kedua tombol tetap BERDAMPINGAN, berbagi lebar
    sama rata, dan kolom penyangga ketiga disembunyikan. Dua tombol pendek
    yang ditumpuk hanya memakan tinggi tanpa menambah keterbacaan. Barisnya
