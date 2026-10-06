@@ -4499,4 +4499,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "up.stopped": {"id": "Unggahan berhenti ({err}). Pilih berkas yang sama untuk melanjutkan.",
                    "en": "The upload stopped ({err}). Pick the same file to resume."},
     "up.cancel": {"id": "Batalkan dan hapus berkas ini", "en": "Cancel and remove this file"},
+    "up.pause": {"id": "Jeda unggahan", "en": "Pause upload"},
+    "up.resume": {"id": "Lanjutkan unggahan", "en": "Resume upload"},
+    "up.paused_at": {"id": "Dijeda di {done} ({pct}) · tekan ▶ untuk melanjutkan.",
+                     "en": "Paused at {done} ({pct}) · press ▶ to resume."},
 }

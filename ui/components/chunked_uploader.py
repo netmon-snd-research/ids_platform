@@ -95,7 +95,7 @@ def _labels() -> dict:
     from ui.i18n import t
     keys = ("btn", "hint", "drop", "connecting", "resuming", "keep_open",
             "left", "retry", "done", "received", "paused", "too_big",
-            "expired", "stopped", "cancel")
+            "expired", "stopped", "cancel", "pause", "resume", "paused_at")
     # Placeholder {..} dibiarkan utuh untuk diisi JavaScript.
     return {k: t(f"up.{k}") for k in keys}
 
@@ -143,12 +143,13 @@ _WIDGET_HTML = r"""
 <style>
   /* Warna BERMAKNA, masing-masing sebagai triplet rgb supaya latar bernada
      tipisnya dapat diturunkan: aksen = sedang mengunggah, ok = diterima utuh,
-     warn = koneksi terganggu dan sedang dicoba lagi, err = gagal/ditolak;
+     warn = koneksi terganggu dan sedang dicoba lagi, err = gagal/ditolak,
+     hold = dijeda pengguna (netral-tenang: bukan masalah, hanya berhenti);
      csv/json = jenis berkas. Nilai terang di sini, nilai gelap disetel
      applyTheme() saat halaman induk bertema gelap. */
   :root { --bg:#ffffff; --panel:#f0f2f6; --fg:#31333f; --muted:rgba(49,51,63,.6);
           --line:rgba(49,51,63,.2);
-          --acc:255,75,75; --ok:21,128,61; --warn:180,83,9; --err:220,38,38;
+          --acc:255,75,75; --ok:21,128,61; --warn:180,83,9; --err:220,38,38; --hold:71,85,105;
           --csv:13,148,136; --json:37,99,235; }
   * { box-sizing: border-box; }
   /* `hidden` HARUS menang atas `display` milik kelas mana pun: tanpa ini
@@ -174,11 +175,12 @@ _WIDGET_HTML = r"""
   /* Sedang mengunggah = NETRAL (hanya bilahnya yang beraksen), sebab merah
      juga berarti gagal: baris yang normal tidak boleh terlihat seperti error.
      Latar bernada hanya untuk keadaan yang perlu diperhatikan. */
-  .file { --st: var(--acc); display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px;
+  .file { --st: var(--acc); display: grid; grid-template-columns: auto 1fr auto auto; gap: 4px 6px;
           align-items: center; margin-top: 10px; padding: 10px 8px 10px 10px; border-radius: 8px;
           background: transparent; border: 1px solid var(--line);
           transition: background .3s, border-color .3s; }
-  .file.ok, .file.warn, .file.err { background: rgba(var(--st),.08); border-color: rgba(var(--st),.28); }
+  .file.ok, .file.warn, .file.err, .file.hold { background: rgba(var(--st),.08); border-color: rgba(var(--st),.28); }
+  .file.hold { --st: var(--hold); }
   .file.ok { --st: var(--ok); }
   .file.warn { --st: var(--warn); }
   .file.err { --st: var(--err); }
@@ -189,11 +191,14 @@ _WIDGET_HTML = r"""
   .badge.csv { --t: var(--csv); }
   .name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-  .file.ok .meta, .file.warn .meta, .file.err .meta { color: rgb(var(--st)); font-weight: 600; }
+  .file.ok .meta, .file.warn .meta, .file.err .meta, .file.hold .meta { color: rgb(var(--st)); font-weight: 600; }
+  .badge { margin-right: 6px; }
   .x { background: none; border: none; cursor: pointer; color: var(--muted);
        width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; }
   .x:hover { color: rgb(var(--err)); background: rgba(var(--err),.12); }
   .x:focus-visible { outline: 2px solid rgb(var(--acc)); }
+  /* Jeda/lanjutkan BUKAN tindakan merusak, jadi sorotnya aksen, bukan merah. */
+  .x.pz:hover { color: rgb(var(--acc)); background: rgba(var(--acc),.12); }
   .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(var(--st),.15);
          overflow: hidden; margin-top: 6px; }
   .bar > div { height: 100%; width: 0; background: rgb(var(--st)); transition: width .3s, background .3s; }
@@ -217,6 +222,12 @@ _WIDGET_HTML = r"""
 <div class="file" id="row" hidden>
   <div class="badge" id="badge" aria-hidden="true"></div>
   <div style="min-width:0"><div class="name" id="name"></div><div class="meta" id="meta"></div></div>
+  <button class="x pz" id="pause" type="button" hidden>
+    <svg id="icoPause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    <svg id="icoPlay" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden>
+      <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+  </button>
   <button class="x" id="cancel" type="button">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
          stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -257,9 +268,9 @@ function applyTheme() {
     // Versi gelap warna bermakna: lebih terang supaya tetap kontras.
     const tones = dark
       ? { "--ok": "74,222,128", "--warn": "251,191,36", "--err": "248,113,113",
-          "--csv": "45,212,191", "--json": "96,165,250" }
+          "--csv": "45,212,191", "--json": "96,165,250", "--hold": "148,163,184" }
       : { "--ok": "21,128,61", "--warn": "180,83,9", "--err": "220,38,38",
-          "--csv": "13,148,136", "--json": "37,99,235" };
+          "--csv": "13,148,136", "--json": "37,99,235", "--hold": "71,85,105" };
     for (const [k, v] of Object.entries(tones)) r.setProperty(k, v);
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
   } catch (_) { /* tetap memakai warna bawaan */ }
@@ -327,7 +338,22 @@ function putChunk(url, blob, onProgress) {
   });
 }
 
-let running = false, cancelled = false;
+let running = false, cancelled = false, paused = false, wake = null;
+
+// Jeda: potongan yang sedang terkirim dibatalkan (server hanya menyimpan
+// potongan UTUH, jadi tidak ada yang rusak), lalu perulangan menunggu sampai
+// pengguna menekan lanjutkan. Lanjutkan menanyakan posisi terakhir ke server.
+function setPauseButton(visible) {
+  $("pause").hidden = !visible;
+  // Atribut, bukan properti `.hidden`: elemen SVG tidak punya properti itu,
+  // jadi menulisnya tidak mengganti ikon apa pun.
+  $("icoPause").toggleAttribute("hidden", paused);
+  $("icoPlay").toggleAttribute("hidden", !paused);
+  const label = paused ? L.resume : L.pause;
+  $("pause").title = label;
+  $("pause").setAttribute("aria-label", label);
+}
+function waitForResume() { return new Promise((r) => (wake = r)); }
 
 async function upload(file) {
   if (running) return;
@@ -335,8 +361,9 @@ async function upload(file) {
     row(file.name, size(file.size) + " · " + fmt(L.too_big, { limit: LIMIT }), { error: true });
     return;
   }
-  running = true; cancelled = false;
+  running = true; cancelled = false; paused = false;
   lockZone(true);
+  setPauseButton(true);
   row(file.name, size(file.size) + " · " + L.connecting, { pct: 0 });
   let t0 = Date.now(), base = 0;
   const show = (sent) => {
@@ -369,6 +396,16 @@ async function upload(file) {
     if (received > 0) row(file.name, fmt(L.resuming, { done: size(received) }), { pct: received / file.size * 100 });
     while (received < file.size) {
       if (cancelled) return;
+      if (paused) {
+        row(file.name, fmt(L.paused_at, { done: size(received), pct: (received / file.size * 100).toFixed(1) + "%" }),
+            { pct: received / file.size * 100, state: "hold" });
+        await waitForResume();
+        if (cancelled) return;
+        try { const s = await api("/" + C.token, {}); if (s.status === 200) received = s.body.received; } catch (_) {}
+        base = received; t0 = Date.now(); fails = 0;     // kecepatan dihitung ulang sejak dilanjutkan
+        show(received);
+        continue;
+      }
       const at = received, end = Math.min(at + C.chunk, file.size);
       try {
         const res = await putChunk(C.prefix + "/" + C.token + "/chunk?offset=" + at,
@@ -387,6 +424,7 @@ async function upload(file) {
         } else { throw new Error("HTTP " + res.status); }
       } catch (e) {
         if (cancelled) return;
+        if (paused) continue;                            // dibatalkan oleh tombol jeda
         // Jaringan putus / server sibuk: tunggu, tanyakan posisi terakhir, ulangi.
         fails++;
         const wait = Math.min(30000, 1000 * 2 ** Math.min(fails, 5));
@@ -396,8 +434,9 @@ async function upload(file) {
         try { const s = await api("/" + C.token, {}); if (s.status === 200) received = s.body.received; } catch (_) {}
         continue;
       }
-      show(received);
+      if (!paused) show(received);
     }
+    setPauseButton(false);
     row(file.name, size(file.size) + " · " + L.done, { pct: 100, state: "ok" });
     // Halaman memuat ulang sendiri begitu server melihat berkasnya lengkap.
   } catch (e) {
@@ -405,12 +444,26 @@ async function upload(file) {
       row(file.name, fmt(L.stopped, { err: e.message }), { error: true });
       lockZone(false);
     }
-  } finally { running = false; }
+  } finally {
+    running = false;
+    if (!$("row").className.includes("ok")) setPauseButton(false);
+  }
 }
+
+$("pause").addEventListener("click", () => {
+  if (!running) return;
+  paused = !paused;
+  setPauseButton(true);
+  if (paused) { if (xhr) try { xhr.abort(); } catch (_) {} }
+  else if (wake) { const w = wake; wake = null; w(); }
+});
 
 $("cancel").addEventListener("click", async () => {
   cancelled = true;
   if (xhr) try { xhr.abort(); } catch (_) {}
+  if (wake) { const w = wake; wake = null; w(); }   // lepaskan perulangan yang sedang dijeda
+  paused = false;
+  setPauseButton(false);
   try { await api("/" + C.token, { method: "DELETE" }); } catch (_) {}
   $("row").hidden = true;
   $("f").value = "";
