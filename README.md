@@ -230,8 +230,8 @@ lewat HTTP. Untuk domain publik, sunting `docker/proxy/Caddyfile`: ganti
 ### 4. Menutup akses jalankan
 
 Bawaannya siapa pun boleh menjalankan eksperimen. Di internet terbuka itu
-berarti antrean dapat dipenuhi orang asing (bawaannya satu run pada satu
-waktu dengan pagu RAM 3,5 GB; keduanya dapat dinaikkan lewat `.env`):
+berarti antrean dapat dipenuhi orang asing (bawaannya empat run sekaligus
+dengan pagu RAM 32 GB; keduanya diatur lewat `.env`):
 
 ```
 REQUIRE_LOGIN_TO_RUN=true
@@ -282,7 +282,7 @@ menekan sepuluh kali.
   gabungkan langkah 3 dan 4.
 * Pagu memori worker adalah batas nyata: dataset besar ditolak di muka oleh
   `dataset_ram_blocker`, bukan dibiarkan gagal di tengah jalan. Bawaannya
-  3500 MB (mesin pengembangan); server menyetelnya lewat satu variabel
+  32000 MB, yaitu angka server lab; mesin yang lebih kecil menurunkannya lewat
   `WORKER_MEM_LIMIT_MB` di `.env`, yang mengatur pagu worker dan pagu UI
   sekaligus. Lihat [docs/MIGRASI.md](docs/MIGRASI.md) langkah 8.
 
@@ -787,7 +787,7 @@ This is an honest list. The platform is intentionally scoped.
 - **Classical ML only.** No deep learning (LSTM, Transformer, GNN). The contracts and storage layer could be extended, but no DL pipeline currently exists.
 - **Pre-extracted inputs required.** HIKARI2021 is a pre-extracted feature CSV; EVE-cbr ingests raw Suricata **EVE NDJSON/JSONL logs** and does its own feature engineering across the 14 phases. There is no pcap-to-feature extraction stage in this repo.
 - **EVE-cbr focuses on TLS traffic** and derives its `Target` label from Suricata alerts (not external ground truth); metrics are reported on the natural holdout. Other app protocols are split out but the registered pipelines process the TLS split.
-- **EVE memory profile.** The cbr adapter caps sampling/training rows (e.g. `modeling_train_rows=150000`) so a large EVE log stays within the worker's `mem_limit`, whose default is 3500m; the cbr core default of 10M rows would OOM. That default is not a hard ceiling: a server raises both the worker cap and the UI's guard by setting `WORKER_MEM_LIMIT_MB` in `.env` (see [docs/MIGRASI.md](docs/MIGRASI.md) step 8). The adapter's own row caps are separate numbers and do not move with it, so raising the cap changes no pipeline result.
+- **EVE memory profile.** The cbr adapter caps sampling/training rows (e.g. `modeling_train_rows=150000`) so a large EVE log stays within the worker's `mem_limit`, whose default is 32000m shared by `CELERY_CONCURRENCY` concurrent runs; the cbr core default of 10M rows would OOM. That default is not a hard ceiling: a server raises both the worker cap and the UI's guard by setting `WORKER_MEM_LIMIT_MB` in `.env` (see [docs/MIGRASI.md](docs/MIGRASI.md) step 8). The adapter's own row caps are separate numbers and do not move with it, so raising the cap changes no pipeline result.
 - **Dataset files must be placed manually** in `storage/datasets/`. There is no file upload widget in the UI; this is a deliberate choice to keep dataset provenance traceable.
 - **No CI/CD.** Tests are run locally; there is no GitHub Actions / Jenkins / etc. pipeline configured at the time of writing.
 - **SQLite, not PostgreSQL.** Sufficient for a single-user research workload but not horizontally scalable.

@@ -65,7 +65,7 @@ _EXT_MAP: dict[str, tuple[str, ...]] = {
 #
 # Jalur eksekusi CSV membaca berkas SEPENUHNYA ke RAM
 # (`orchestrator.dataset_parser.parse_dataset` → `pd.read_csv(resolved)`), di
-# dalam worker yang berpagu `mem_limit: 3500m`. Tanpa penjaga, berkas yang
+# dalam worker yang berpagu `mem_limit`. Tanpa penjaga, berkas yang
 # terlalu besar melewati diagnosa dengan mulus — diagnosa hanya mencuplik
 # 50.000 baris — lalu worker di-OOM-kill. Karena `--pool=solo`, SIGKILL
 # membunuh satu-satunya proses dan tidak ada yang menulis status gagal:
@@ -88,7 +88,7 @@ CSV_RAM_MULTIPLIER = 1.5
 #: Pagu RAM worker dalam MB. Dibaca dari environment supaya nilainya tidak
 #: menjadi salinan kedua dari `mem_limit` di docker-compose.yml yang dapat
 #: menyimpang diam-diam; bawaannya sama dengan nilai di sana.
-WORKER_MEM_LIMIT_MB = int(os.getenv("WORKER_MEM_LIMIT_MB", "3500"))
+WORKER_MEM_LIMIT_MB = int(os.getenv("WORKER_MEM_LIMIT_MB", "32000"))
 
 #: Berapa eksperimen boleh berjalan BERSAMAAN di worker. Dibaca dari variabel
 #: yang sama dengan `--concurrency` container worker.

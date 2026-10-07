@@ -65,19 +65,26 @@ services:
       celery -A workers.celery_worker worker
       --loglevel=info
       --pool=${CELERY_POOL:-prefork}
-      --concurrency=${CELERY_CONCURRENCY:-1}
-    # Pagu RAM worker. 3500 MB adalah BAWAAN untuk mesin pengembangan: Docker
-    # Desktop di WSL2 hanya memberi VM-nya sekitar 3,53 GB, dan angka itulah
-    # yang dipakai saat pipeline cbr EVE diukur. Ia bukan batas mati platform.
+      --concurrency=${CELERY_CONCURRENCY:-4}
+    # Pagu RAM worker. Bawaannya 32000 MB, yaitu angka server lab tempat
+    # platform ini dipasang: repositori ini memang hanya melayani mesin itu,
+    # jadi bawaannya menggambarkan mesin itu, bukan laptop pengembang.
     #
-    # Server dengan RAM lebih besar menyetel WORKER_MEM_LIMIT_MB di `.env`
-    # (lihat docs/MIGRASI.md langkah 8). Satu baris di sana mengubah pagu ini
-    # DAN pagu yang dibaca UI di bawah, sebab keduanya membaca variabel yang
-    # sama. Tanpa `.env`, keduanya tetap 3500 persis seperti sebelumnya.
+    # Bersama `--concurrency` di atas, angka ini menentukan jatah SATU run:
+    # `mem_limit` berlaku untuk seluruh container, jadi 32000 dibagi 4 memberi
+    # 8000 MB per run. Jatah itu harus tetap di atas 3,7 GB, puncak RAM
+    # pipeline terberat (EVE cbr pada modeling_train_rows=150_000).
+    #
+    # Mesin yang lebih kecil WAJIB menurunkannya lewat `.env`, sebab pagu yang
+    # lebih besar daripada RAM mesin berarti tidak ada rem sama sekali. Laptop
+    # pengembangan memakai pagu 3500 dengan concurrency 1; tulis keduanya di
+    # `.env`, bukan di sini. (Nama variabelnya sengaja TIDAK ditulis lengkap
+    # dengan tanda sama dengan di komentar ini: test kesamaan pagu menghitung
+    # setiap baris yang memuat bentuk itu, termasuk komentar.)
     #
     # Tidak ada mode "tanpa batas": worker tanpa mem_limit yang kehabisan
     # memori tidak mati sendirian, ia menyeret seluruh server.
-    mem_limit: ${WORKER_MEM_LIMIT_MB:-3500}m
+    mem_limit: ${WORKER_MEM_LIMIT_MB:-32000}m
     volumes:
       - ./storage:/app/storage          # shared storage with UI
     depends_on:
@@ -112,7 +119,7 @@ services:
       # Dibaca `config/celery_config.py` sebagai `worker_concurrency`. Nilainya
       # WAJIB sama dengan `--concurrency` di atas, dan dibuat sama dengan
       # membaca variabel yang sama.
-      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-1}
+      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-4}
       - JSON_LOGS=true
       - LOG_LEVEL=INFO
       # Folder kerja sementara pipeline. TANPA ini `tempfile.mkdtemp()` jatuh
@@ -210,14 +217,14 @@ services:
       # itu: menyetel WORKER_MEM_LIMIT_MB di `.env` menaikkan keduanya
       # sekaligus, jadi pagu worker dan pagu yang dipercaya UI tidak dapat
       # menyimpang. Test test_dataset_ram_guard.py menjaga kesamaan ini.
-      - WORKER_MEM_LIMIT_MB=${WORKER_MEM_LIMIT_MB:-3500}
+      - WORKER_MEM_LIMIT_MB=${WORKER_MEM_LIMIT_MB:-32000}
       # Jumlah run yang boleh berjalan bersamaan, dibaca UI BUKAN untuk
       # menjalankan apa pun melainkan untuk membagi pagu di atas: `mem_limit`
       # berlaku untuk SELURUH container, jadi dengan concurrency 4 tiap run
       # hanya berhak atas seperempatnya. Tanpa baris ini penjaga dataset akan
       # mengira tiap run boleh memakai seluruh pagu, dan meloloskan berkas yang
       # pasti membunuh worker begitu dua run berjalan berbarengan.
-      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-1}
+      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-4}
       # Admin pertama dibuat oleh service ini saat start, dari environment.
       #
       # ⚠️ BAWAANNYA `LAB_UBI_UNHAS` / `sampingkulkas09`, TERTULIS DI REPOSITORI INI. Lihat

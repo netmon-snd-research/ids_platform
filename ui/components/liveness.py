@@ -99,7 +99,7 @@ def snoozed(snoozes: dict, experiment_id: str, state: str, minutes: int,
 
 def worker_mem_limit_mb() -> Optional[float]:
     try:
-        return float(os.getenv("WORKER_MEM_LIMIT_MB", "3500"))
+        return float(os.getenv("WORKER_MEM_LIMIT_MB", "32000"))
     except ValueError:
         return None
 

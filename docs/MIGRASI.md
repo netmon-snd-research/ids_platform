@@ -159,10 +159,10 @@ ls storage/uploaded_pipelines/     # TIDAK boleh ada "uploaded_pipelines" di sin
 
 ### 8. Sesuaikan pagu memori: SATU baris di `.env`
 
-Bawaannya 3500 MB, yaitu pagu mesin pengembangan (Docker Desktop di WSL2 hanya
-memberi VM-nya sekitar 3,53 GB). Di server Linux tidak ada VM itu, jadi angka
-tersebut hanya memotong worker tanpa sebab dan membuat UI menolak dataset yang
-sebenarnya muat.
+Bawaannya 32000 MB, yaitu angka server lab yang dilayani repositori ini. Pada
+mesin itu Anda tidak perlu menyetel apa pun. Yang WAJIB menyetelnya adalah
+mesin yang lebih KECIL: pagu yang melebihi RAM mesin berarti tidak ada rem
+sama sekali, dan worker yang kehabisan memori akan menyeret seluruh mesin.
 
 Setel satu variabel di `.env`:
 
@@ -173,7 +173,7 @@ WORKER_MEM_LIMIT_MB=13000
 Satu baris itu mengatur KEDUANYA: `mem_limit` container worker dan pagu yang
 dipercaya UI saat mengunci tombol Run (`dataset_ram_blocker`). Keduanya membaca
 variabel yang sama di `docker-compose.yml`, jadi tidak ada lagi dua tempat yang
-dapat menyimpang. Tanpa `.env`, keduanya tetap 3500.
+dapat menyimpang. Tanpa `.env`, keduanya memakai bawaan 32000.
 
 Berlaku setelah `docker compose up -d`. Periksa keduanya benar-benar terpasang:
 
@@ -233,12 +233,13 @@ UI, dan seberapa jauh worker boleh memakai RAM sebelum dibunuh.
 
 ### 8b. Berapa eksperimen boleh berjalan bersamaan
 
-Bawaannya satu per satu. Itu pagu mesin pengembangan, bukan batas rancangan:
-laptop hanya punya 3,5 GB untuk worker, dan dua run besar berbarengan di sana
-pasti OOM. Server dengan RAM sungguhan tidak perlu menahan diri.
+Bawaannya 4, mengikuti server lab. Jadi di mesin itu beberapa eksperimen sudah
+berjalan bersamaan tanpa Anda menyetel apa pun. Yang perlu menurunkannya adalah
+mesin kecil: laptop pengembangan memakai 1, sebab dua run besar berbarengan di
+pagu 3,5 GB pasti OOM.
 
 ```bash
-CELERY_CONCURRENCY=4
+CELERY_CONCURRENCY=4      # bawaan; turunkan jadi 1 di mesin kecil
 ```
 
 Satu variabel itu mengatur tiga hal sekaligus, dan ketiganya membacanya dari

@@ -5,10 +5,16 @@ Centralized config so both the worker and experiment_service
 use the same broker/backend settings.
 
 CONCURRENCY NOTE:
-  CELERY_CONCURRENCY defaults to 1: one experiment at a time. The default is
-  conservative, not a design limit. It fits the development laptop, where the
-  worker gets a 3.5 GB cap and three concurrent SVC runs on 500K rows would
-  OOM. A server with real RAM can and should run several at once.
+  docker-compose.yml ships CELERY_CONCURRENCY=4: four experiments at once,
+  the lab server this repository serves. The fallback below stays 1 because
+  it describes the other situation, running the UI or a worker directly
+  without compose, where nothing is parallel anyway. Under compose the
+  variable is always passed explicitly, so the two cannot disagree in
+  practice.
+
+  A smaller machine must lower it in `.env`. The development laptop used
+  CELERY_CONCURRENCY=1 with a 3.5 GB cap, where three concurrent SVC runs on
+  500K rows would OOM.
 
   Raise it in `.env` (docker-compose.yml reads the same variable for both
   `--concurrency` and this setting, so the two cannot drift). Two things move
@@ -33,5 +39,5 @@ CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localho
 # Set to True to use async (Celery), False to use sync (local_worker)
 USE_ASYNC = os.environ.get("USE_ASYNC", "false").lower() == "true"
 
-# Default 1: one at a time. See CONCURRENCY NOTE above before raising it.
+# Fallback for running outside compose. Compose ships 4; see note above.
 CELERY_CONCURRENCY = int(os.environ.get("CELERY_CONCURRENCY", "1"))
