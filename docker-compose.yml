@@ -52,11 +52,20 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     container_name: ids_worker
+    # Berapa eksperimen boleh berjalan BERSAMAAN. Bawaannya 1, jadi tanpa
+    # `.env` perilakunya persis seperti sebelumnya: satu per satu.
+    #
+    # Server menaikkannya lewat `.env` (lihat docs/MIGRASI.md langkah 8b).
+    # Pool-nya ikut variabel yang sama supaya keduanya tidak dapat menyimpang:
+    # `--pool=solo` TIDAK PERNAH paralel berapa pun concurrency-nya, dan
+    # ketidakcocokan itu diam, antrean hanya terlihat lambat tanpa pesan apa
+    # pun. Bawaan `prefork` aman di sini sebab container ini selalu Linux;
+    # `CELERY_POOL=solo` disediakan hanya sebagai jalan keluar.
     command: >
       celery -A workers.celery_worker worker
       --loglevel=info
-      --pool=solo
-      --concurrency=1
+      --pool=${CELERY_POOL:-prefork}
+      --concurrency=${CELERY_CONCURRENCY:-1}
     # Pagu RAM worker. 3500 MB adalah BAWAAN untuk mesin pengembangan: Docker
     # Desktop di WSL2 hanya memberi VM-nya sekitar 3,53 GB, dan angka itulah
     # yang dipakai saat pipeline cbr EVE diukur. Ia bukan batas mati platform.
@@ -100,7 +109,10 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - USE_ASYNC=true
       - DB_PATH=/app/storage/experiments.db
-      - CELERY_CONCURRENCY=1
+      # Dibaca `config/celery_config.py` sebagai `worker_concurrency`. Nilainya
+      # WAJIB sama dengan `--concurrency` di atas, dan dibuat sama dengan
+      # membaca variabel yang sama.
+      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-1}
       - JSON_LOGS=true
       - LOG_LEVEL=INFO
       # Folder kerja sementara pipeline. TANPA ini `tempfile.mkdtemp()` jatuh
@@ -199,6 +211,13 @@ services:
       # sekaligus, jadi pagu worker dan pagu yang dipercaya UI tidak dapat
       # menyimpang. Test test_dataset_ram_guard.py menjaga kesamaan ini.
       - WORKER_MEM_LIMIT_MB=${WORKER_MEM_LIMIT_MB:-3500}
+      # Jumlah run yang boleh berjalan bersamaan, dibaca UI BUKAN untuk
+      # menjalankan apa pun melainkan untuk membagi pagu di atas: `mem_limit`
+      # berlaku untuk SELURUH container, jadi dengan concurrency 4 tiap run
+      # hanya berhak atas seperempatnya. Tanpa baris ini penjaga dataset akan
+      # mengira tiap run boleh memakai seluruh pagu, dan meloloskan berkas yang
+      # pasti membunuh worker begitu dua run berjalan berbarengan.
+      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-1}
       # Admin pertama dibuat oleh service ini saat start, dari environment.
       #
       # ⚠️ BAWAANNYA `LAB_UBI_UNHAS` / `sampingkulkas09`, TERTULIS DI REPOSITORI INI. Lihat

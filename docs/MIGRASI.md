@@ -231,6 +231,66 @@ pipeline EVE (`modeling_train_rows`, `n_jobs`) dan `PARAM_BOUNDS` adalah angka
 tersendiri yang tidak ikut naik. Yang berubah hanya dataset mana yang diizinkan
 UI, dan seberapa jauh worker boleh memakai RAM sebelum dibunuh.
 
+### 8b. Berapa eksperimen boleh berjalan bersamaan
+
+Bawaannya satu per satu. Itu pagu mesin pengembangan, bukan batas rancangan:
+laptop hanya punya 3,5 GB untuk worker, dan dua run besar berbarengan di sana
+pasti OOM. Server dengan RAM sungguhan tidak perlu menahan diri.
+
+```bash
+CELERY_CONCURRENCY=4
+```
+
+Satu variabel itu mengatur tiga hal sekaligus, dan ketiganya membacanya dari
+tempat yang sama supaya tidak dapat menyimpang:
+
+1. `--concurrency` container worker;
+2. pool worker, yang compose setel ke `prefork`. Ini penting: `--pool=solo`
+   TIDAK PERNAH menjalankan apa pun secara paralel berapa pun angka
+   concurrency-nya, dan ketidakcocokan itu tidak memberi pesan apa-apa,
+   antreannya hanya terlihat lambat;
+3. jatah RAM per run yang dipakai UI untuk mengunci dataset terlalu besar.
+
+**Memilih angkanya.** `mem_limit` berlaku untuk SELURUH container, jadi run
+yang berjalan bersamaan berbagi satu pagu:
+
+```
+jatah satu run = WORKER_MEM_LIMIT_MB / CELERY_CONCURRENCY
+```
+
+Jatah itu harus tetap nyaman di atas 3,7 GB, yaitu puncak RAM pipeline
+terberat (EVE cbr pada `modeling_train_rows=150_000`). Dengan
+`WORKER_MEM_LIMIT_MB=32000`:
+
+| CELERY_CONCURRENCY | Jatah per run | Layak? |
+|---|---|---|
+| 1 | 32000 MB | ya, tetapi mesin besar menganggur |
+| 4 | 8000 MB | ya, titik yang disarankan |
+| 8 | 4000 MB | mepet, hanya bila semua run kecil |
+| 16 | 2000 MB | tidak, di bawah puncak EVE |
+
+Pada server 128 GB yang pagunya 32000, menaikkan keduanya bersama juga sah:
+`WORKER_MEM_LIMIT_MB=64000` dengan `CELERY_CONCURRENCY=8` memberi 8000 MB per
+run dan tetap menyisakan 64 GB untuk sistem.
+
+Periksa setelah `docker compose up -d`:
+
+```bash
+docker inspect ids_worker --format '{{.Config.Cmd}}'     # harus memuat prefork dan angkanya
+docker exec ids_ui printenv CELERY_CONCURRENCY           # UI harus tahu angka yang sama
+docker compose logs worker | grep -i concurrency         # celery melaporkannya saat start
+```
+
+**Yang TIDAK berubah karena ini.** Hasil tiap eksperimen tetap sama persis:
+setiap run punya seed sendiri dan tidak berbagi apa pun dengan run lain,
+`n_jobs` di dalam pipeline tidak ikut naik, dan tidak ada angka di laporan yang
+bergeser karena dua run kebetulan berjalan berbarengan. Yang berubah hanya
+berapa lama antreannya.
+
+Kuota per orang (`MAX_ACTIVE_RUNS_PER_OWNER`, bawaan 3) tetap berlaku di atas
+ini: concurrency menentukan berapa slot yang ada, kuota menentukan berapa
+banyak slot itu boleh diisi satu orang.
+
 ### 9. Build sebagai non-root
 
 ```bash

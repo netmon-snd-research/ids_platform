@@ -230,8 +230,8 @@ lewat HTTP. Untuk domain publik, sunting `docker/proxy/Caddyfile`: ganti
 ### 4. Menutup akses jalankan
 
 Bawaannya siapa pun boleh menjalankan eksperimen. Di internet terbuka itu
-berarti antrean dapat dipenuhi orang asing (satu worker, concurrency 1, dengan
-pagu RAM bawaan 3,5 GB):
+berarti antrean dapat dipenuhi orang asing (bawaannya satu run pada satu
+waktu dengan pagu RAM 3,5 GB; keduanya dapat dinaikkan lewat `.env`):
 
 ```
 REQUIRE_LOGIN_TO_RUN=true

@@ -90,6 +90,17 @@ CSV_RAM_MULTIPLIER = 1.5
 #: menyimpang diam-diam; bawaannya sama dengan nilai di sana.
 WORKER_MEM_LIMIT_MB = int(os.getenv("WORKER_MEM_LIMIT_MB", "3500"))
 
+#: Berapa eksperimen boleh berjalan BERSAMAAN di worker. Dibaca dari variabel
+#: yang sama dengan `--concurrency` container worker.
+#:
+#: Dipakai di sini karena `mem_limit` berlaku untuk SELURUH container, bukan per
+#: run: dengan concurrency 4, empat run berbagi satu pagu, jadi jatah yang
+#: benar-benar dimiliki satu run adalah seperempatnya. Mengabaikan ini membuat
+#: penjaga di bawah meloloskan berkas yang muat sendirian tetapi pasti
+#: membunuh worker begitu run kedua berjalan berbarengan, dan kegagalannya
+#: muncul sebagai OOM di tengah jalan, bukan sebagai tombol yang terkunci.
+CELERY_CONCURRENCY = int(os.getenv("CELERY_CONCURRENCY", "1"))
+
 #: Format yang DIKECUALIKAN: `parse_dataset` hanya membaca stub 100 record
 #: untuk NDJSON/JSON, dan pipeline EVE memprosesnya bertahap
 #: (`read_chunksize=100_000`). Ukuran berkas karena itu tidak menentukan
@@ -108,13 +119,21 @@ def dataset_ram_blocker(dataset_path: str) -> tuple[str, str]:
 
     Dua tingkat, karena kepastiannya dua tingkat:
 
-    * **block** — taksirannya melebihi SELURUH pagu worker. DataFrame-nya saja
-      sudah tidak muat, jadi kegagalannya bukan kemungkinan melainkan
+    * **block**: taksirannya melebihi SELURUH jatah satu run. DataFrame-nya
+      saja sudah tidak muat, jadi kegagalannya bukan kemungkinan melainkan
       kepastian aritmetika. Tombol Run dikunci.
-    * **warn** — taksirannya melewati separuh pagu. Pipeline masih butuh RAM di
-      atas DataFrame-nya (salinan split latih/uji, model terlatih, internal
-      sklearn), jadi ini wilayah yang patut diberitahukan tetapi tidak patut
-      dihalangi.
+    * **warn**: taksirannya melewati separuh jatah itu. Pipeline masih butuh
+      RAM di atas DataFrame-nya (salinan split latih/uji, model terlatih,
+      internal sklearn), jadi ini wilayah yang patut diberitahukan tetapi
+      tidak patut dihalangi.
+
+    "Jatah satu run" bukan selalu sama dengan pagu container. ``mem_limit``
+    berlaku untuk SELURUH container, jadi ketika ``CELERY_CONCURRENCY`` lebih
+    dari satu, run yang berjalan bersamaan berbagi pagu itu dan jatah satu run
+    adalah ``WORKER_MEM_LIMIT_MB // CELERY_CONCURRENCY``. Pembagian itu
+    disengaja konservatif: ia menganggap semua run sebesar yang ini. Tanpanya
+    penjaga ini lolos pada berkas yang muat sendirian tetapi membunuh worker
+    begitu run kedua berjalan.
 
     Dataset penelitian ini sendiri jauh di bawah keduanya: 288 MB × 1,5 =
     432 MB, yaitu ±12% pagu.
@@ -129,7 +148,7 @@ def dataset_ram_blocker(dataset_path: str) -> tuple[str, str]:
     except OSError:                       # pragma: no cover - defensif
         return "", ""
 
-    pagu_mb = WORKER_MEM_LIMIT_MB
+    pagu_mb = WORKER_MEM_LIMIT_MB // max(1, CELERY_CONCURRENCY)
     taksiran_mb = ukuran * CSV_RAM_MULTIPLIER / (1024 * 1024)
     nilai = {"filename": path.name,
              "size": format_size(ukuran),
