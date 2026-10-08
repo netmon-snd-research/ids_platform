@@ -487,6 +487,17 @@ def display_name_for(dataset_type: str, db_path: str | None = None) -> str:
     return _tanpa_tanda_pisah(entry.get("display_name") or dataset_type)
 
 
+def title_for(dataset_type: str, db_path: str | None = None) -> str:
+    """JUDUL research saja: bagian nama tampilan sesudah pemisah terakhir.
+
+    "A. Muh. Rayyan Eka Putra (2024) · Klasifikasi Trafik Terenkripsi
+    HIKARI2021" menjadi "Klasifikasi Trafik Terenkripsi HIKARI2021". Nama
+    tanpa pemisah (mis. research kontribusi) dipakai utuh.
+    """
+    nama = display_name_for(dataset_type, db_path)
+    return nama.rsplit(LABEL_SEP, 1)[-1].strip() or nama
+
+
 def short_label_from(dataset_type: str, entry: dict) -> str:
     """Label pendek dari atribusi yang SUDAH ada — MURNI, tanpa basis data.
 

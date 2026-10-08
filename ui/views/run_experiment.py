@@ -32,6 +32,7 @@ from orchestrator.research_registry import (
     attribution_for as get_research_attribution,
     display_name_for as get_research_display_name,
     short_label_for as get_research_short_label,
+    title_for as get_research_title,
 )
 from ui.views._artifact_browser import render_file_browser, format_size
 from ui.components import dialogs as dlg
@@ -45,7 +46,7 @@ from ui.components.page_flags import wait_before_refresh
 # ulang berhenti (eksperimennya sendiri tidak disentuh).
 PAGE_NAME = 'Run Experiment'
 from ui.components.sections import (
-    back_button, card_labels, mobile_card_labels, prose, render_facts,
+    back_button, card_labels, mobile_card_labels, render_facts,
     render_section, section_body,
 )
 from streamlit_option_menu import option_menu
@@ -1269,68 +1270,6 @@ _DS_COLS = (
 )
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def _header_names(path: str, mtime: float) -> tuple:
-    """Nama kolom dari BARIS PERTAMA berkas. Tidak pernah memuat isinya.
-
-    ``mtime`` ikut menjadi kunci cache supaya berkas yang berubah dibaca ulang.
-    Kosong bila tidak terbaca — dan "tidak terbaca" bukan "tidak cocok".
-    """
-    import csv
-    import json as _json
-
-    ext = Path(path).suffix.lower()
-    try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-            baris = fh.readline()
-            if not baris.strip():
-                return ()
-            if ext == ".csv":
-                return tuple(next(csv.reader([baris])))
-            obj = _json.loads(baris)
-            return tuple(obj) if isinstance(obj, dict) else ()
-    except Exception:                       # pragma: no cover - defensif
-        return ()
-
-
-def _type_mismatch(path: str, dataset_type: str) -> bool:
-    """True bila baris pertama berkas ini tidak berbagi SATU pun kolom dengan
-    kontrak research-nya.
-
-    Jenis dataset sebuah berkas platform hanya DITEBAK dari ekstensinya: setiap
-    `.csv` ditawarkan sebagai HIKARI2021, termasuk berkas penelitian lain yang
-    kebetulan tersimpan di folder yang sama.
-
-    Yang dibandingkan adalah kolom yang DIHARAPKAN, bukan kolom LABEL-nya.
-    Label boleh memang tidak ada: EVE_SURICATA membentuk `Target` sendiri dari
-    alert Suricata, dan menandainya "tidak cocok" akan menyalahkan berkas yang
-    justru sah.
-
-    Ragu berarti TIDAK: berkas yang tidak terbaca, dan research yang tidak
-    menyebutkan kolom harapan apa pun, tidak pernah ditandai.
-    """
-    from database.models import is_uploaded_research
-
-    if is_uploaded_research(dataset_type):
-        return False                        # datasetnya memang miliknya sendiri
-    try:
-        from orchestrator.research_registry import schema_for
-        skema = schema_for(dataset_type) or {}
-    except Exception:                       # pragma: no cover - defensif
-        return False
-    diharapkan = {str(k) for k in (list(skema.get("expected_columns") or [])
-                                   + list(skema.get("expected_top_level_keys")
-                                          or []))}
-    if not diharapkan:
-        return False
-    try:
-        mtime = Path(path).stat().st_mtime
-    except OSError:                          # pragma: no cover - defensif
-        return False
-    kolom = set(_header_names(path, mtime))
-    return bool(kolom) and not (kolom & diharapkan)
-
-
 def _render_dataset_table(options, sizes, mtimes=None) -> None:
     """Daftar berkas dataset, terbaru di atas: cari menurut nama, lalu pilih.
 
@@ -1824,7 +1763,8 @@ def _render_check_list(result: dict, dataset_type: str = "") -> None:
         st.markdown(f"- {icon} **{title}** · {message}")
 
 
-def _render_validation_failure(v: dict, dataset_type: str) -> None:
+def _render_validation_failure(v: dict, dataset_type: str, *,
+                               covered: bool = False) -> None:
     """Ringkasan kegagalan validasi — pengganti dump "Missing required columns:
     [80+ kolom]".
 
@@ -1832,6 +1772,9 @@ def _render_validation_failure(v: dict, dataset_type: str) -> None:
     dikembalikan validation_service, jadi tidak ada logika validasi yang
     diubah — hanya cara menampilkannya: jumlah + beberapa contoh + daftar penuh
     di dalam expander yang tertutup secara default.
+
+    ``covered``: kotak "Uji kecocokan" sedang tampil, jadi kolom yang kurang
+    tidak diulang di sini. Galat lain tetap ditampilkan.
     """
     vr = v.get("validation_result")
     missing = list(getattr(vr, "missing_columns", None) or [])
@@ -1847,18 +1790,20 @@ def _render_validation_failure(v: dict, dataset_type: str) -> None:
     other = [e for e in errors
              if not any(e.startswith(p) for p in _RAW_LIST_ERROR_PREFIXES)]
 
+    if missing and covered:
+        # Kotak "Uji kecocokan" di bawah sudah menyatakan berkas ini tidak
+        # cocok di mana pun, dan dialognya merinci kolom yang kurang.
+        missing = []
     if missing:
-        st.error(_missing_items_summary(len(missing), missing, dataset_type, unit=unit))
-        prose(
-            t("re.msg_probably_wrong_type", dtype=dataset_type),
-            key="dataset_mismatch")
+        st.error(t("re.msg_columns_missing", count=len(missing), unit=unit,
+                   dtype=get_research_title(dataset_type)))
         with st.expander(t("re.exp_see_all_missing", count=len(missing),
                                  unit=unit),
                          expanded=False):
             st.code("\n".join(str(c) for c in missing), language=None)
     for e in other:
         st.error(e)
-    if not missing and not other:
+    if not missing and not other and not covered:
         st.error(v.get("error") or "Validasi dataset gagal.")
 
 
@@ -1876,17 +1821,6 @@ def _any_compatible(diag: dict) -> bool:
     false → kotak uji kecocokan.
     """
     return bool(diag.get("compatible_types"))
-
-
-def _requirement_summary(dataset_type: str) -> str:
-    """Syarat dataset dalam SATU baris untuk kotak pipeline: format · kolom
-    label · sifat fitur. Diturunkan dari _EXT_MAP + skema + dict persyaratan
-    terpusat yang sama dengan panel "Persyaratan Dataset"."""
-    schema = get_schema(dataset_type) or {}
-    req = _DATASET_REQUIREMENTS.get(dataset_type, {})
-    exts = " / ".join(f"`{e}`" for e in _dataset_extensions(dataset_type))
-    label = f"kolom label `{schema.get('label_column', '?')}`"
-    return f"{exts} · {label} · {req.get('summary_line', '-')}"
 
 
 def _compat_dialog_body(diag: dict, dataset_type: str, *,
@@ -2026,6 +1960,8 @@ def _render_compat_boxes(diag: dict) -> None:
         return
 
     st.warning(t("re.msg_no_auto_match"))
+    # Judul research SAJA. Penulis, jenis, dan syarat berkasnya ada di dialog
+    # uji kecocokan dan di katalog; di sini mereka hanya memanjangkan kotak.
     ordered = _sorted_results(diag)          # yang paling dekat cocok lebih dulu
     cols = st.columns(len(ordered))
     for col, (dtype, _result) in zip(cols, ordered):
@@ -2033,9 +1969,8 @@ def _render_compat_boxes(diag: dict) -> None:
         # di ui/views/view_results.py) — tidak masuk ke dalam context manager,
         # sehingga tombol tidak pernah menjalankan apa pun dari konteks bersarang.
         box = col.container(border=True)
-        box.markdown(f"**{get_research_display_name(dtype)}** · `{dtype}` · "
-                     f"{_requirement_summary(dtype)}")
-        if box.button("Uji kecocokan", key=f"compat_test_{dtype}",
+        box.markdown(f"**{get_research_title(dtype)}**")
+        if box.button(t("re.btn_compat_test"), key=f"compat_test_{dtype}",
                       use_container_width=True):
             # Hanya set flag. Dialog dibuka di alur utama (setelah blok ini)
             # pada run yang SAMA — tidak perlu st.rerun() dari dalam kotak.
@@ -2830,7 +2765,7 @@ def _render_execute():
     def _ds_label(p: str) -> str:
         raw = _sizes.get(p, -1)
         size = format_size(raw) if raw >= 0 else "ukuran tidak diketahui"
-        return f"{Path(p).name}  ·  {_path_to_type.get(p, '?')}  ({size})"
+        return f"{Path(p).name}  ({size})"
 
     # Kontrol mengisi LEBAR PENUH kolomnya; ringkasannya menyusul di bawah.
     # Label disembunyikan, bukan dikosongkan: placeholder "Pilih dataset…" di
@@ -2855,15 +2790,6 @@ def _render_execute():
         return
 
     dataset_type = _path_to_type.get(dataset_path, "")
-    # Jenis dataset sebuah berkas platform hanya DITEBAK dari ekstensinya, jadi
-    # berkas penelitian lain yang kebetulan tersimpan di folder yang sama ikut
-    # ditawarkan. Diperiksa DI SINI, saat satu berkas benar-benar dipilih, dan
-    # bukan saat daftarnya digambar: daftar itu tergambar pada setiap render,
-    # dan membaca baris pertama setiap berkas di sana membebani halaman ini
-    # untuk keterangan yang tidak seorang pun sedang cari.
-    if _type_mismatch(dataset_path, dataset_type):
-        st.warning(t("re.dataset_label_missing",
-                     files=Path(dataset_path).name))
     # Persist for downstream readers (PDF/report read session dataset_path/type).
     st.session_state["dataset_path"] = dataset_path
     st.session_state["dataset_type"] = dataset_type
@@ -2885,12 +2811,6 @@ def _render_execute():
     # ke tab Dataset pada modal "Info" di judul halaman. Yang tersisa di sini
     # hanya yang menuntut TINDAKAN.
 
-    # Ringkasan kegagalan validasi (jumlah + contoh + "lihat semua" tertutup).
-    # Tetap di halaman: ia bukan keterangan yang dicari, melainkan hal yang
-    # harus diperbaiki sebelum apa pun dapat dijalankan.
-    if not v.get("success"):
-        _render_validation_failure(v, dataset_type)
-
     # Kecocokan dataset — ON-DEMAND. Yang berjalan otomatis di sini HANYA
     # pertanyaan "apakah ada research pipeline yang cocok?" (dari diagnose_all
     # yang sudah ber-cache: satu kali baca tercuplik untuk seluruh pipeline).
@@ -2910,7 +2830,15 @@ def _render_execute():
     # Kotak per research pipeline hanya muncul bila TIDAK ada yang cocok.
     # Kecocokan yang normal kini terbaca dari bagian Pemilihan Research
     # Pipeline di bawah, yang memang terisi hanya oleh pipeline yang cocok.
-    if not _any_compatible(_diag):
+    no_match = not _any_compatible(_diag)
+
+    # Ringkasan kegagalan validasi: satu baris + daftar tertutup. Bila kotak
+    # "Uji kecocokan" ikut tampil, kolom yang kurang tidak diulang di sini;
+    # cukup satu pesan yang menyatakan berkas ini belum cocok.
+    if not v.get("success"):
+        _render_validation_failure(v, dataset_type, covered=no_match)
+
+    if no_match:
         _render_compat_boxes(_diag)
     _maybe_render_compat_dialog(_diag)
 

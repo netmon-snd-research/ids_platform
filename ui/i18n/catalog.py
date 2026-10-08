@@ -758,14 +758,6 @@ CATALOG: dict[str, dict[str, str]] = {
     # Berkas yang jenisnya hanya DITEBAK dari ekstensi. Disebut, bukan
     # disembunyikan: menyembunyikannya akan membuang berkas yang sah hanya
     # karena kolomnya dinamai lain.
-    "re.dataset_label_missing": {
-        "id": "Tidak berbagi satu pun kolom dengan kontrak research-nya: "
-              "{files}. Jenis dataset ditebak dari ekstensi berkas, jadi "
-              "berkas ini mungkin milik penelitian lain dan akan gagal saat "
-              "dijalankan.",
-        "en": "Shares no column with its research contract: {files}. Dataset "
-              "type is guessed from the file extension, so this file may "
-              "belong to another study and will fail when run."},
     # Penghapusan eksperimen. Alasannya selalu DINYATAKAN: tombol mati tanpa
     # keterangan membuat orang menebak apa yang salah.
     "err.run_too_many_active": {
@@ -1767,21 +1759,15 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.prompt_matching_files": {
         "id": "Berkas yang cocok di `storage/datasets/` (filter: `{ext}`):",
         "en": "Matching files in `storage/datasets/` (filter: `{ext}`):"},
-    "re.msg_probably_wrong_type": {
-        "id": "Sepertinya berkas ini **bukan** dataset `{dtype}`. Jalankan "
-              "**Uji kecocokan** pada kotak di bawah untuk melihat research "
-              "pipeline yang sesuai beserta langkah perbaikannya.",
-        "en": "This file is probably **not** a `{dtype}` dataset. Run the "
-              "**compatibility test** in the box below to see which research "
-              "pipelines fit, and how to fix it."},
     "re.exp_see_all_missing": {
-        "id": "Lihat semua {count} {unit} yang diminta skema",
-        "en": "See all {count} {unit} the schema requires"},
+        "id": "Lihat {count} {unit} yang kurang",
+        "en": "See the {count} missing {unit}"},
+    "re.msg_columns_missing": {
+        "id": "Belum cocok dengan **{dtype}**: kurang {count} {unit}.",
+        "en": "Does not fit **{dtype}** yet: {count} {unit} missing."},
     "re.msg_no_auto_match": {
-        "id": "Dataset belum otomatis cocok dengan pipeline mana pun. Pilih "
-              "salah satu untuk menjalankan uji kecocokan.",
-        "en": "The dataset does not automatically fit any pipeline yet. "
-              "Choose one to run the compatibility test."},
+        "id": "Dataset ini belum cocok dengan research pipeline mana pun.",
+        "en": "This dataset does not fit any research pipeline yet."},
     "re.msg_catalog_pick_dropped": {
         "id": "`{pipeline}` tidak kompatibel dengan dataset yang dipilih, jadi "
               "pilihan dari katalog tidak dipasang. Pilih dataset yang sesuai, "
