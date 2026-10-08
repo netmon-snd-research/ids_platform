@@ -515,8 +515,17 @@ applyTheme();
 setInterval(applyTheme, 1500);   // tema dapat diganti saat halaman terbuka
 
 // Tinggi iframe mengikuti isinya (satu origin, jadi bingkainya dapat diatur).
+// Wadah Streamlit di sekelilingnya ikut diatur: tingginya dipatok dari
+// `height=` saat dibuat, dan tanpa ini baris berkas meluber keluar wadah,
+// menimpa elemen di bawahnya (garis pemisah dan judul tembus ke kartu).
 function fit() {
-  try { window.frameElement.style.height = Math.ceil(document.body.scrollHeight) + 2 + "px"; } catch (_) {}
+  try {
+    const h = Math.ceil(document.body.scrollHeight) + 2 + "px";
+    const frame = window.frameElement;
+    frame.style.height = h;
+    const box = frame.closest('[data-testid="stElementContainer"]');
+    if (box) box.style.height = h;
+  } catch (_) {}
 }
 if (window.ResizeObserver) new ResizeObserver(fit).observe(document.body);
 
