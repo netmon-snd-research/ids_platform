@@ -1847,12 +1847,26 @@ CATALOG: dict[str, dict[str, str]] = {
                          "en": "**Pipeline metadata**: fills the registry snippet; it does not affect the validation result."},
     "ap.note_checked_against_all": {"id": "Kecocokan berkas diperiksa terhadap seluruh research pipeline sekaligus, jadi tidak perlu memilih pipeline lebih dulu.",
                                     "en": "The file's compatibility is checked against every research pipeline at once, so there is no need to choose a pipeline first."},
-    "ap.err_file_exists": {"id": "`{filename}` sudah ada di `storage/datasets/`. Ganti nama berkasnya. Platform tidak menimpa dataset yang sudah ada.",
-                           "en": "`{filename}` already exists in `storage/datasets/`. Rename the file. The platform never overwrites an existing dataset."},
+    "ap.err_file_exists": {"id": "Nama **{filename}** baru saja dipakai dataset lain. Coba simpan sekali lagi; dataset yang sudah ada tidak pernah ditimpa.",
+                           "en": "The name **{filename}** was just taken by another dataset. Try saving again; an existing dataset is never overwritten."},
+    "ap.err_same_content": {
+        "id": "Dataset ini sudah pernah diunggah dengan nama **{existing}**. "
+              "Isinya sama persis, jadi tidak perlu diunggah lagi. Pilih "
+              "**{existing}** langsung di halaman Jalankan Eksperimen.",
+        "en": "This dataset was already uploaded as **{existing}**. The "
+              "content is identical, so there is no need to upload it again. "
+              "Pick **{existing}** directly on the Run Experiment page."},
+    "ap.msg_renamed": {
+        "id": "Nama **{filename}** sudah dipakai dataset lain yang isinya "
+              "berbeda. Dataset ini akan disimpan sebagai **{new}**.",
+        "en": "The name **{filename}** is already used by a different "
+              "dataset. This one will be saved as **{new}**."},
+    "ap.checking_content": {"id": "Membandingkan isi berkas…",
+                            "en": "Comparing file content…"},
     "ap.msg_saved_as": {
-        "id": "Tersimpan sebagai `{filename}` ({size}). Sudah dapat dipilih di "
-              "halaman Run Experiment.",
-        "en": "Saved as `{filename}` ({size}). It can now be selected on the "
+        "id": "Tersimpan sebagai **{filename}** ({size}). Sudah dapat dipilih "
+              "di halaman Jalankan Eksperimen.",
+        "en": "Saved as **{filename}** ({size}). It can now be selected on the "
               "Run Experiment page."},
     "ap.empty_no_files_on_server": {
         "id": "Belum ada berkas di `storage/datasets/`. Salin berkas ke folder "

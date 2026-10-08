@@ -3841,7 +3841,12 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
     menimpa dataset yang sudah dipakai eksperimen — persis yang dilarang
     prinsip platform ini sendiri: menyembunyikan tombol tidak pernah menjadi
     satu-satunya penghalang.
+
+    Dataset yang ISINYA sudah ada (SHA-256 sama, apa pun namanya) juga ditolak
+    di sini, bukan hanya di layar.
     """
+    from orchestrator.dataset_identity import find_same_content
+
     require_upload(user)
     if Path(target).exists():
         raise SubmissionError(
@@ -3849,6 +3854,11 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
             key="ap.err_file_exists", values={"filename": Path(target).name})
     local = getattr(src, "local_path", None)
     if local is not None:
+        same = find_same_content(local)
+        if same is not None:
+            raise SubmissionError(
+                f"Dataset ini sudah pernah diunggah dengan nama {same.name}.",
+                key="ap.err_same_content", values={"existing": same.name})
         # Hasil unggahan bertahap sudah utuh di disk, di filesystem yang sama
         # (storage/): DIPINDAHKAN, bukan disalin — menyalin 20 GB berarti
         # menunggu lama dan sesaat memakan dua kali ruang disk.
@@ -3857,6 +3867,12 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
         os.replace(local, target)
         return Path(target).stat().st_size
     written, _truncated = copy_stream(src, target)
+    same = find_same_content(target)
+    if same is not None:
+        Path(target).unlink(missing_ok=True)
+        raise SubmissionError(
+            f"Dataset ini sudah pernah diunggah dengan nama {same.name}.",
+            key="ap.err_same_content", values={"existing": same.name})
     return written
 
 
@@ -4054,6 +4070,16 @@ def _render_dataset_upload_tab() -> None:
                  f"batas ukuran dan tanpa penyalinan.")
         return
 
+    # Dataset dikenali dari ISINYA. Duplikat ditolak sebelum diagnosa, supaya
+    # berkas yang toh tidak akan disimpan tidak diperiksa sia-sia. Hanya
+    # dataset berukuran sama yang di-hash, jadi biasanya ini seketika.
+    from orchestrator.dataset_identity import available_name, find_same_content
+    with st.spinner(t("ap.checking_content")):
+        same = find_same_content(uploaded.local_path)
+    if same is not None:
+        st.error(t("ap.err_same_content", existing=same.name))
+        return
+
     # 1. Diagnosa DULU — belum ada apa pun yang ditulis ke storage/datasets/.
     with st.spinner("Memeriksa dataset…"):
         diag = _diagnose_uploaded(uploaded, safe)
@@ -4070,10 +4096,12 @@ def _render_dataset_upload_tab() -> None:
 
     # 2. Baru menyimpan, atas tindakan eksplisit pengguna.
     st.divider()
-    target = _dataset_target_path(safe)
-    if target.exists():
-        st.error(t("ap.err_file_exists", filename=safe))
-        return
+    # Nama yang sudah dipakai dataset LAIN (isinya berbeda, sudah dipastikan
+    # di atas) tidak ditimpa: berkas ini disimpan dengan nama berikutnya.
+    save_name = available_name(safe)
+    if save_name != safe:
+        st.info(t("ap.msg_renamed", filename=safe, new=save_name))
+    target = _dataset_target_path(save_name)
     if not diag.get("compatible_types"):
         st.warning(t("ap.msg_not_compatible_yet"))
     user = current_user()
@@ -4112,7 +4140,7 @@ def _render_dataset_upload_tab() -> None:
             from ui.components.chunked_uploader import finish
             finish(uploaded.token)
             st.session_state.pop(_DS_DIAG_KEY, None)
-        st.success(t("ap.msg_saved_as", filename=safe,
+        st.success(t("ap.msg_saved_as", filename=save_name,
                             size=format_size(written)))
 
 

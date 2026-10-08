@@ -29,7 +29,7 @@ import threading
 import time
 from pathlib import Path
 
-from config.settings import DATASETS_DIR, STORAGE_DIR
+from config.settings import STORAGE_DIR
 
 #: Batas ukuran satu dataset yang diunggah lewat peramban.
 #:
@@ -183,8 +183,10 @@ def begin(token: str, filename: str, size: int) -> dict:
             f"Berkas melebihi batas unggah {MAX_DATASET_UPLOAD_BYTES // 1024 ** 3} GB. "
             "Salin ke storage/datasets/ di server, lalu pakai tab "
             "Daftarkan dari server.", 413)
-    if (Path(DATASETS_DIR) / name).exists():
-        raise UploadError(f"Berkas {name} sudah ada di storage/datasets/.", 409)
+    # Nama yang sudah dipakai TIDAK ditolak di sini. Dataset dikenali dari
+    # isinya, dan isi baru diketahui setelah berkas lengkap: duplikat ditolak
+    # di halaman, dan isi berbeda bernama sama disimpan dengan nama lain
+    # (lihat orchestrator/dataset_identity.py).
 
     with _lock:
         entry = _entry(token)
