@@ -241,6 +241,17 @@ def error_message(exc) -> str:
     return t(key, **values)
 
 
+def run_error_text(err) -> str:
+    """Galat dari ``create_and_run_experiment``/``rerun_experiment``.
+
+    Sebagian galatnya berupa KUNCI katalog (mis. ``err.run_requires_login``,
+    ``err.dataset_deleted``), sebagian kalimat biasa. Kunci diterjemahkan;
+    kalimat dikembalikan apa adanya. Sebelumnya kuncinya tampil mentah.
+    """
+    text = str(err or "")
+    return t(text) if text in CATALOG else text
+
+
 def stored_error_message(text: str) -> str:
     """Pesan kegagalan yang TERSIMPAN pada catatan eksperimen.
 

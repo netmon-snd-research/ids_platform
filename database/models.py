@@ -344,8 +344,22 @@ CREATE TABLE IF NOT EXISTS login_sessions (
 """
 
 
+# Pemilik dan visibilitas dataset di storage/datasets/ (lihat
+# orchestrator/dataset_registry.py). Satu baris per nama berkas; berkas tanpa
+# baris diperlakukan PUBLIK tanpa pemilik, jadi dataset lama tidak berubah.
+CREATE_DATASETS_TABLE = """
+CREATE TABLE IF NOT EXISTS datasets (
+    filename    TEXT PRIMARY KEY,
+    owner       TEXT,
+    visibility  TEXT NOT NULL DEFAULT 'public',
+    uploaded_at TEXT NOT NULL
+);
+"""
+
+
 ALL_TABLES = [CREATE_EXPERIMENTS_TABLE, CREATE_USERS_TABLE,
               CREATE_SUBMISSIONS_TABLE, CREATE_REGISTERED_PIPELINES_TABLE,
               CREATE_PIPELINE_TRIALS_TABLE,
               CREATE_RESEARCH_PIPELINES_TABLE,
-              CREATE_LOGIN_SESSIONS_TABLE]
+              CREATE_LOGIN_SESSIONS_TABLE,
+              CREATE_DATASETS_TABLE]

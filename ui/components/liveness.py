@@ -202,7 +202,9 @@ def _rerun(status_data: dict, user: Optional[dict]) -> Optional[str]:
         device_id=status_data.get("device_id") or _device_id(),
     )
     if not result.get("success"):
-        return result.get("error") or result.get("message") or "?"
+        from ui.components.validator_messages import run_error_text
+        return (run_error_text(result.get("error"))
+                or result.get("message") or "?")
     if result.get("async_mode"):
         st.session_state["polling_experiment_id"] = result["experiment_id"]
     return None

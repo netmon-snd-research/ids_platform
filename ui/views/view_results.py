@@ -8,6 +8,7 @@ import time
 import streamlit as st
 
 from ui.i18n import t
+from ui.components.validator_messages import run_error_text
 import pandas as pd
 
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -1150,13 +1151,15 @@ def _detail_dialog_body(experiment_id: str) -> None:
             dlg.close_dialog(dlg.DETAIL_KEY)
             dlg.clear_payload(dlg.DETAIL_KEY)
             st.rerun()
-    if act[1].button(t("ps.btn_rerun"), key=f"dlg_rerun_{exp['id']}"):
+    blok = _rerun_blocker(exp)
+    if act[1].button(t("ps.btn_rerun"), key=f"dlg_rerun_{exp['id']}",
+                     disabled=bool(blok), help=t(blok) if blok else None):
         r = rerun_experiment(exp["id"], **viewer_identity())
         if r.get("success"):
             st.success(t("ps.msg_rerun_started",
                          id=r["experiment_id"][:8]))
         else:
-            st.error(r.get("error") or t("ps.msg_failed_short"))
+            st.error(run_error_text(r.get("error")) or t("ps.msg_failed_short"))
     if act[2].button("Tutup", key=f"dlg_close_{exp['id']}"):
         dlg.close_dialog(dlg.DETAIL_KEY)
         dlg.clear_payload(dlg.DETAIL_KEY)
@@ -1171,6 +1174,22 @@ def _detail_dialog(experiment_id):
     """Modal detail, judulnya disusun pada bahasa yang sedang aktif."""
     dlg.dialog_decorator(t("ps.dlg_detail_title"), dlg.DETAIL_KEY,
                          width="large")(_detail_dialog_body)(experiment_id)
+
+
+def _rerun_blocker(exp: dict) -> str | None:
+    """Kunci alasan eksperimen ini tidak dapat dijalankan ulang oleh penonton,
+    atau None. Datasetnya sudah dihapus, atau privat milik orang lain.
+
+    Hanya mematikan TOMBOLNYA; penolakan sebenarnya ada di
+    ``create_and_run_experiment``.
+    """
+    from orchestrator.dataset_registry import access_blocker
+    from ui.views.login import current_user
+
+    try:
+        return access_blocker(current_user(), exp.get("dataset_path") or "")
+    except Exception:                       # pragma: no cover - defensif
+        return None
 
 
 def _render_selected_actions(selected_id: str, cols=None) -> None:
@@ -1194,13 +1213,16 @@ def _render_selected_actions(selected_id: str, cols=None) -> None:
                       use_container_width=True):
         dlg.open_dialog(dlg.DETAIL_KEY, selected_id)
         st.rerun()
-    if cols[1].button(t("ps.btn_rerun"), key=f"rerun_{selected_id}", use_container_width=True):
+    blok = _rerun_blocker(exp)
+    if cols[1].button(t("ps.btn_rerun"), key=f"rerun_{selected_id}",
+                      use_container_width=True, disabled=bool(blok),
+                      help=t(blok) if blok else None):
         r = rerun_experiment(selected_id, **viewer_identity())
         if r.get("success"):
             st.success(t("ps.msg_rerun_refresh",
                          id=r["experiment_id"][:8]))
         else:
-            st.error(r.get("error") or t("ps.msg_failed_short"))
+            st.error(run_error_text(r.get("error")) or t("ps.msg_failed_short"))
     if exp["status"] in ("QUEUED", "RUNNING"):
         if cols[2].button(t("ps.btn_cancel_short"), key=f"cancel_{selected_id}",
                           use_container_width=True):

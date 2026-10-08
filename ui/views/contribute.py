@@ -597,10 +597,12 @@ def _trial_dataset_options() -> list[tuple[str, str]]:
 
     try:
         options = _dataset_options_cached(0, str(DATASETS_DIR))[0]
+        from orchestrator.dataset_registry import visible_paths
+        boleh = set(visible_paths([p for p, _ in options], current_user()))
     except Exception:                        # pragma: no cover - defensif
         logger.exception("Daftar dataset uji tidak terbaca")
         return []
-    return [(path, dtype) for path, dtype in options]
+    return [(path, dtype) for path, dtype in options if path in boleh]
 
 
 def _render_trial_compatibility(dataset_type: str, dataset_path: str) -> None:
@@ -3828,7 +3830,18 @@ def upload_size(uploaded) -> int:
         return 0
 
 
-def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
+def _visible_to(user: dict | None):
+    """Penyaring ``find_same_content``: hanya dataset yang boleh dilihat
+    ``user``. Dataset privat orang lain tidak dapat ia pakai, jadi salinannya
+    sendiri tidak dianggap duplikat."""
+    from orchestrator.dataset_registry import all_rows, can_see
+
+    rows = all_rows()
+    return lambda f: can_see(user, Path(f).name, rows)
+
+
+def save_dataset_upload(src, target: Path, *, user: dict | None,
+                        visibility: str = "public") -> int:
     """Simpan berkas dataset ke `storage/datasets/`.
 
     ``user`` WAJIB (keyword-only, tanpa default): izin diperiksa DI SINI, jadi
@@ -3843,18 +3856,24 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
     satu-satunya penghalang.
 
     Dataset yang ISINYA sudah ada (SHA-256 sama, apa pun namanya) juga ditolak
-    di sini, bukan hanya di layar.
+    di sini, bukan hanya di layar, dibandingkan hanya dengan dataset yang
+    boleh dilihat ``user``.
+
+    ``visibility`` ("public"/"private") dicatat bersama pemiliknya sesudah
+    berkasnya tersimpan (lihat orchestrator/dataset_registry.py).
     """
     from orchestrator.dataset_identity import find_same_content
+    from orchestrator.dataset_registry import record
 
     require_upload(user)
+    terlihat = _visible_to(user)
     if Path(target).exists():
         raise SubmissionError(
             f"Berkas `{Path(target).name}` sudah ada di storage/datasets/.",
             key="ap.err_file_exists", values={"filename": Path(target).name})
     local = getattr(src, "local_path", None)
     if local is not None:
-        same = find_same_content(local)
+        same = find_same_content(local, only=terlihat)
         if same is not None:
             raise SubmissionError(
                 f"Dataset ini sudah pernah diunggah dengan nama {same.name}.",
@@ -3865,14 +3884,16 @@ def save_dataset_upload(src, target: Path, *, user: dict | None) -> int:
         src.close()
         Path(target).parent.mkdir(parents=True, exist_ok=True)
         os.replace(local, target)
+        record(Path(target).name, owner=user["username"], visibility=visibility)
         return Path(target).stat().st_size
     written, _truncated = copy_stream(src, target)
-    same = find_same_content(target)
+    same = find_same_content(target, only=terlihat)
     if same is not None:
         Path(target).unlink(missing_ok=True)
         raise SubmissionError(
             f"Dataset ini sudah pernah diunggah dengan nama {same.name}.",
             key="ap.err_same_content", values={"existing": same.name})
+    record(Path(target).name, owner=user["username"], visibility=visibility)
     return written
 
 
@@ -4075,7 +4096,8 @@ def _render_dataset_upload_tab() -> None:
     # dataset berukuran sama yang di-hash, jadi biasanya ini seketika.
     from orchestrator.dataset_identity import available_name, find_same_content
     with st.spinner(t("ap.checking_content")):
-        same = find_same_content(uploaded.local_path)
+        same = find_same_content(uploaded.local_path,
+                                 only=_visible_to(current_user()))
     if same is not None:
         st.error(t("ap.err_same_content", existing=same.name))
         return
@@ -4118,11 +4140,16 @@ def _render_dataset_upload_tab() -> None:
     # pengaman sebelum titik ini tetap berlaku (batas ukuran, sanitasi nama,
     # penolakan menimpa, ekstensi yang diizinkan), dan `save_dataset_upload`
     # tetap memanggil `require_upload` sehingga izinnya ditegakkan di lapis aksi.
+    visibility = st.radio(
+        t("ap.lbl_visibility"), ("public", "private"), horizontal=True,
+        format_func=lambda v: t(f"ap.visibility_{v}"),
+        key="contrib_ds_visibility", help=t("ap.help_visibility"))
     if st.button(t("ap.btn_save_dataset"), type="primary",
                  key="contrib_submit_dataset",
                  help=t("ap.help_dataset_direct")):
         try:
-            written = save_dataset_upload(uploaded, target, user=user)
+            written = save_dataset_upload(uploaded, target, user=user,
+                                          visibility=visibility)
         except (AuthError, PermissionDenied, SubmissionError, OSError) as e:
             st.error(error_message(e))
             return

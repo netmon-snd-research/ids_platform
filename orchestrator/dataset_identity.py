@@ -43,11 +43,16 @@ def file_hash(path: str | Path) -> str:
 
 
 def find_same_content(path: str | Path,
-                      datasets_dir: str | Path | None = None) -> Path | None:
+                      datasets_dir: str | Path | None = None, *,
+                      only=None) -> Path | None:
     """Dataset di ``storage/datasets/`` yang isinya identik dengan ``path``.
 
     Mengembalikan path dataset itu, atau None bila tidak ada. Berkas ``path``
     sendiri tidak pernah dianggap duplikat dirinya.
+
+    ``only(path) -> bool`` membatasi pembandingnya, mis. hanya dataset yang
+    boleh dilihat pengunggah: dataset privat orang lain tidak dapat ia pakai,
+    jadi menolak salinannya membuat ia buntu.
     """
     p = Path(path)
     root = Path(datasets_dir or DATASETS_DIR)
@@ -58,6 +63,8 @@ def find_same_content(path: str | Path,
     candidates = []
     for f in sorted(root.iterdir()):
         if f.suffix.lower() not in DATASET_EXTENSIONS or not f.is_file():
+            continue
+        if only is not None and not only(f):
             continue
         try:
             if f.stat().st_size != size or f.resolve() == me:

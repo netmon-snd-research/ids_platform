@@ -1251,7 +1251,23 @@ def _all_dataset_options() -> list[tuple[str, str]]:
     used (``_list_dataset_files`` per registered type), so the dataset_path and
     dataset_type that flow to execution stay identical to before.
     """
-    return _dataset_catalog()[0]
+    from orchestrator.dataset_registry import visible_paths
+
+    semua = _dataset_catalog()[0]
+    boleh = set(visible_paths([p for p, _ in semua], _viewer()))
+    return [(p, d) for p, d in semua if p in boleh]
+
+
+def _viewer() -> dict | None:
+    from ui.views.login import current_user
+    return current_user()
+
+
+#: Kategori penyaring tabel dataset. Hanya tampil untuk pengguna yang masuk:
+#: pengunjung tidak punya dataset sendiri.
+DS_CAT_ALL, DS_CAT_MINE, DS_CAT_PRIVATE = "all", "mine", "private"
+_DS_DELETE_KEY = "_ds_confirm_delete"
+_DS_FLASH_KEY = "_ds_flash"
 
 
 #: Kolom tabel dataset: (kunci label i18n, bobot lebar). Bentuknya mengikuti
@@ -1266,7 +1282,7 @@ _DS_COLS = (
     ("re.col_dataset_uploaded", 5),
     ("re.col_dataset_format", 3),
     ("re.col_dataset_size", 4),
-    ("", 3),
+    ("", 6),
 )
 
 
@@ -1280,12 +1296,42 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
     """
     import html
 
-    baris = dataset_rows(options, sizes, mtimes)
+    from orchestrator.dataset_registry import (
+        VIS_PRIVATE, all_rows, can_delete, info, registry_name,
+    )
 
-    query = st.text_input(t("re.lbl_search_dataset"), key="ds_query",
-                          placeholder=t("re.ph_search_dataset"))
+    user = _viewer()
+    username = (user or {}).get("username")
+    catatan = all_rows()
+    meta = {}
+    for path, _dtype in options or []:
+        nama_berkas = registry_name(path)
+        if nama_berkas is None:
+            continue
+        m = info(nama_berkas, catatan)
+        meta[path] = {"owner": m["owner"],
+                      "private": m["visibility"] == VIS_PRIVATE,
+                      "deletable": can_delete(user, nama_berkas, catatan)}
+    baris = dataset_rows(options, sizes, mtimes, meta)
 
-    cocok = filter_datasets(baris, query)
+    pesan = st.session_state.pop(_DS_FLASH_KEY, "")
+    if pesan:
+        st.success(pesan)
+
+    if username:
+        cari, saring = st.columns([3, 2])
+        query = cari.text_input(t("re.lbl_search_dataset"), key="ds_query",
+                                placeholder=t("re.ph_search_dataset"))
+        kategori = saring.selectbox(
+            t("re.lbl_dataset_category"),
+            (DS_CAT_ALL, DS_CAT_MINE, DS_CAT_PRIVATE),
+            format_func=lambda k: t(f"re.ds_cat_{k}"), key="ds_category")
+    else:
+        query = st.text_input(t("re.lbl_search_dataset"), key="ds_query",
+                              placeholder=t("re.ph_search_dataset"))
+        kategori = DS_CAT_ALL
+
+    cocok = filter_datasets(baris, query, kategori, username)
 
     # Daftar kosong: tabelnya TIDAK digambar — tabel tanpa baris terbaca
     # seperti kegagalan memuat. Keadaannya tetap dinyatakan oleh baris jumlah
@@ -1308,16 +1354,35 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
                             unsafe_allow_html=True)
                 sel = st.columns(lebar, vertical_alignment="center")
                 nama = html.escape(str(row["name"]))
+                # Dataset privat ditandai di bawah namanya. Pemiliknya disebut
+                # bila bukan penontonnya sendiri (Research Admin melihat
+                # dataset privat semua orang).
+                sub = ""
+                if row.get("private"):
+                    pemilik = row.get("owner")
+                    sub = (t("re.ds_private_of", owner=pemilik)
+                           if pemilik and pemilik != username
+                           else t("re.ds_private"))
                 # Nama panjang dipotong CSS, dan judulnya membawa nama penuh —
                 # jadi tidak ada nama yang hilang tanpa cara membacanya.
-                sel[0].markdown(f'<span title="{nama}">{nama}</span>',
-                                unsafe_allow_html=True)
+                sel[0].markdown(
+                    f'<span title="{nama}">{nama}</span>'
+                    + (f'<span class="ids-row-sub">{html.escape(sub)}</span>'
+                       if sub else ""),
+                    unsafe_allow_html=True)
                 sel[1].markdown(html.escape(row["uploaded_text"]))
                 sel[2].markdown(html.escape(str(row["format"])))
                 sel[3].markdown(html.escape(str(row["size_text"])))
-                if sel[4].button(t("re.btn_pick_dataset"),
-                                 key=f"ds_pick_{row['path']}",
-                                 use_container_width=True):
+                aksi = sel[4].columns(2)
+                if row.get("deletable") and aksi[1].button(
+                        t("re.btn_delete_dataset"),
+                        key=f"ds_del_{row['path']}",
+                        use_container_width=True):
+                    st.session_state[_DS_DELETE_KEY] = row["path"]
+                    st.rerun()
+                if aksi[0].button(t("re.btn_pick_dataset"),
+                                  key=f"ds_pick_{row['path']}",
+                                  use_container_width=True):
                     # DITITIPKAN, bukan ditulis langsung ke kunci widget.
                     # Tabel ini digambar SESUDAH dropdown-nya dibuat, dan
                     # Streamlit menolak `session_state["dataset_select"] = …`
@@ -1327,8 +1392,52 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
                     # jalannya berikutnya, SEBELUM dropdown dibuat.
                     st.session_state[PENDING_DATASET_KEY] = row["path"]
                     st.rerun()
+                if st.session_state.get(_DS_DELETE_KEY) == row["path"]:
+                    _render_delete_confirm(row, user)
 
     st.caption(t("re.dataset_count", shown=len(cocok), total=len(baris)))
+
+
+def _render_delete_confirm(row: dict, user: dict | None) -> None:
+    """Konfirmasi hapus di bawah barisnya, menyebut apa yang ikut terdampak.
+
+    Berkasnya benar-benar dihapus. Eksperimen yang pernah memakainya tetap
+    tercatat dan terbaca, tetapi tidak dapat dijalankan ulang; itu dikatakan
+    sebelum tombolnya ditekan. Izinnya ditegakkan ``delete_dataset``.
+    """
+    from orchestrator.dataset_registry import DatasetError, delete_dataset, usage
+    from ui.components.validator_messages import error_message
+
+    try:
+        dipakai = usage(row["name"])["total"]
+    except Exception:                       # pragma: no cover - defensif
+        dipakai = 0
+    teks = t("re.ds_delete_confirm", filename=row["name"])
+    if dipakai:
+        teks += " " + t("re.ds_delete_used", count=dipakai)
+    st.warning(teks)
+    tombol = st.columns([1, 1, 3])
+    if tombol[0].button(t("re.btn_delete_dataset"), type="primary",
+                        key=f"ds_del_yes_{row['path']}",
+                        use_container_width=True):
+        try:
+            delete_dataset(row["name"], actor=user)
+        except DatasetError as e:
+            st.error(error_message(e))
+            return
+        except OSError as e:
+            logger.exception("Dataset %s gagal dihapus", row["name"])
+            st.error(t("ap.err_unexpected", kind=type(e).__name__))
+            return
+        st.session_state.pop(_DS_DELETE_KEY, None)
+        st.session_state[_DS_FLASH_KEY] = t("re.ds_deleted",
+                                            filename=row["name"])
+        invalidate_dataset_options()
+        st.rerun()
+    if tombol[1].button(t("action.cancel"), key=f"ds_del_no_{row['path']}",
+                        use_container_width=True):
+        st.session_state.pop(_DS_DELETE_KEY, None)
+        st.rerun()
 
 
 PENDING_DATASET_KEY = "dataset_pick_pending"
@@ -1347,7 +1456,7 @@ def _apply_pending_dataset(paths) -> None:
         st.session_state["dataset_select"] = pending
 
 
-def dataset_rows(options, sizes, mtimes=None) -> list[dict]:
+def dataset_rows(options, sizes, mtimes=None, meta=None) -> list[dict]:
     """Baris tabel dataset, TERBARU di atas. MURNI: tanpa Streamlit dan disk.
 
     ``options`` adalah [(path, dataset_type)] apa adanya dari penelusuran
@@ -1358,6 +1467,9 @@ def dataset_rows(options, sizes, mtimes=None) -> list[dict]:
     Waktu tulis terakhir adalah saat unggahan SELESAI: berkas hasil unggahan
     dipindahkan apa adanya, bukan ditulis ulang. Berkas tanpa waktu diletakkan
     paling bawah; waktu yang sama diurutkan menurut nama.
+
+    ``meta`` ({path: {owner, private, deletable}}) dari catatan dataset;
+    path tanpa catatan adalah dataset publik tanpa pemilik.
     """
     from datetime import datetime, timezone
 
@@ -1382,23 +1494,33 @@ def dataset_rows(options, sizes, mtimes=None) -> list[dict]:
             "format": (Path(nama).suffix.lstrip(".") or "-").upper(),
             "size": ukuran,
             "size_text": format_size(ukuran) if ukuran >= 0 else "-",
+            "owner": (meta or {}).get(path, {}).get("owner"),
+            "private": bool((meta or {}).get(path, {}).get("private")),
+            "deletable": bool((meta or {}).get(path, {}).get("deletable")),
         })
     keluar.sort(key=lambda r: (r["mtime"] is None, -(r["mtime"] or 0),
                                r["name"].lower()))
     return keluar
 
 
-def filter_datasets(rows, query: str = "") -> list[dict]:
-    """Saring menurut kata kunci pada nama berkas. MURNI.
+def filter_datasets(rows, query: str = "", category: str = DS_CAT_ALL,
+                    username: str | None = None) -> list[dict]:
+    """Saring menurut kategori lalu kata kunci pada nama berkas. MURNI.
 
     Hanya nama berkasnya: jenis dataset berkas platform ditebak dari
     ekstensinya, jadi mencocokkan "hikari" padanya akan menampilkan setiap CSV.
+    "Dataset saya" adalah yang diunggah ``username``; "Privat" adalah dataset
+    privat yang memang sudah boleh dilihat penontonnya.
     """
+    hasil = list(rows or [])
+    if category == DS_CAT_MINE:
+        hasil = [r for r in hasil if username and r.get("owner") == username]
+    elif category == DS_CAT_PRIVATE:
+        hasil = [r for r in hasil if r.get("private")]
     teks = str(query or "").strip().lower()
-    if not teks:
-        return list(rows or [])
-    return [row for row in rows or []
-            if teks in str(row.get("name", "")).lower()]
+    if teks:
+        hasil = [r for r in hasil if teks in str(r.get("name", "")).lower()]
+    return hasil
 
 
 def _dataset_sizes() -> dict[str, int]:
@@ -3151,7 +3273,8 @@ def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
 
         if not result["success"]:
             status_box.update(label="Pipeline failed", state="error")
-            st.error(f"{result['error']}")
+            from ui.components.validator_messages import run_error_text
+            st.error(run_error_text(result["error"]))
             return
 
         if result.get("async_mode"):

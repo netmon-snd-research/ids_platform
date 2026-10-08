@@ -232,6 +232,25 @@ def create_and_run_experiment(
             "label_mapping": None,
         }
 
+    # Dataset privat hanya untuk pemiliknya dan Research Admin, dan dataset
+    # yang sudah dihapus tidak dapat dijalankan lagi. Diperiksa DI SINI, jadi
+    # berlaku juga untuk "Jalankan ulang" eksperimen lama.
+    from orchestrator.dataset_registry import access_blocker
+
+    tertutup = access_blocker(get_user(owner) if owner else None, dataset_path)
+    if tertutup:
+        logger.warning("Run ditolak (%s): dataset %s",
+                       tertutup, Path(str(dataset_path)).name)
+        return {
+            "success": False,
+            "experiment_id": None,
+            "async_mode": USE_ASYNC,
+            "error": tertutup,
+            "metrics": None,
+            "feature_names": None,
+            "label_mapping": None,
+        }
+
     ditolak = run_limit_blocker(owner)
     if ditolak:
         logger.warning("Run ditolak pembatas beban (%s): %s",

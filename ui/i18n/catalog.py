@@ -281,6 +281,25 @@ CATALOG: dict[str, dict[str, str]] = {
     # jalan adalah membuka dropdown dan membaca baris panjang satu per satu.
     "re.col_dataset_file": {"id": "Berkas", "en": "File"},
     "re.col_dataset_uploaded": {"id": "Diunggah", "en": "Uploaded"},
+    "re.lbl_dataset_category": {"id": "Kategori", "en": "Category"},
+    "re.ds_cat_all": {"id": "Semua dataset", "en": "All datasets"},
+    "re.ds_cat_mine": {"id": "Dataset saya", "en": "My datasets"},
+    "re.ds_cat_private": {"id": "Privat", "en": "Private"},
+    "re.ds_private": {"id": "🔒 Privat", "en": "🔒 Private"},
+    "re.ds_private_of": {"id": "🔒 Privat · {owner}", "en": "🔒 Private · {owner}"},
+    "re.btn_delete_dataset": {"id": "Hapus", "en": "Delete"},
+    "re.ds_delete_confirm": {
+        "id": "Hapus **{filename}**? Berkasnya dihapus dari server dan tidak "
+              "dapat dikembalikan.",
+        "en": "Delete **{filename}**? The file is removed from the server and "
+              "cannot be restored."},
+    "re.ds_delete_used": {
+        "id": "{count} eksperimen memakai dataset ini. Hasilnya tetap "
+              "tersimpan, tetapi tidak dapat dijalankan ulang.",
+        "en": "{count} experiments used this dataset. Their results are kept, "
+              "but they can no longer be re-run."},
+    "re.ds_deleted": {"id": "**{filename}** sudah dihapus.",
+                      "en": "**{filename}** was deleted."},
     "re.col_dataset_format": {"id": "Format", "en": "Format"},
     "re.col_dataset_size": {"id": "Ukuran", "en": "Size"},
     "re.btn_pick_dataset": {"id": "Pilih", "en": "Select"},
@@ -772,6 +791,24 @@ CATALOG: dict[str, dict[str, str]] = {
               "Tunggu beberapa menit lalu coba lagi.",
         "en": "Too many experiments started in a short time. Wait a few "
               "minutes and try again."},
+    "err.dataset_deleted": {
+        "id": "Dataset eksperimen ini sudah dihapus, jadi eksperimen ini tidak "
+              "dapat dijalankan ulang.",
+        "en": "This experiment's dataset was deleted, so it cannot be re-run."},
+    "err.dataset_private": {
+        "id": "Dataset ini privat milik pengguna lain.",
+        "en": "This dataset is private to another user."},
+    "err.dataset_not_found": {"id": "Dataset **{filename}** tidak ditemukan.",
+                              "en": "Dataset **{filename}** was not found."},
+    "err.dataset_delete_denied": {
+        "id": "Hanya pengunggahnya atau Research Admin yang dapat menghapus "
+              "dataset ini.",
+        "en": "Only its uploader or a Research Admin can delete this dataset."},
+    "err.dataset_in_use": {
+        "id": "**{filename}** sedang dipakai {count} eksperimen yang masih "
+              "berjalan. Tunggu sampai selesai atau batalkan dulu.",
+        "en": "**{filename}** is used by {count} experiments that are still "
+              "running. Wait for them to finish or cancel them first."},
     "err.run_requires_login": {
         "id": "Pemasangan ini menuntut akun aktif untuk menjalankan "
               "eksperimen. Masuk lebih dulu.",
@@ -1831,6 +1868,17 @@ CATALOG: dict[str, dict[str, str]] = {
                                     "en": "The file's compatibility is checked against every research pipeline at once, so there is no need to choose a pipeline first."},
     "ap.err_file_exists": {"id": "Nama **{filename}** baru saja dipakai dataset lain. Coba simpan sekali lagi; dataset yang sudah ada tidak pernah ditimpa.",
                            "en": "The name **{filename}** was just taken by another dataset. Try saving again; an existing dataset is never overwritten."},
+    "ap.lbl_visibility": {"id": "Siapa yang dapat melihat dataset ini?",
+                          "en": "Who can see this dataset?"},
+    "ap.visibility_public": {"id": "Publik", "en": "Public"},
+    "ap.visibility_private": {"id": "Hanya saya", "en": "Only me"},
+    "ap.help_visibility": {
+        "id": "Publik: terlihat dan dapat dipakai semua orang. Hanya saya: "
+              "terlihat oleh Anda dan Research Admin saja. Hasil eksperimennya "
+              "tetap terlihat semua orang.",
+        "en": "Public: visible to and usable by everyone. Only me: visible to "
+              "you and Research Admins only. Experiment results stay visible "
+              "to everyone."},
     "ap.err_same_content": {
         "id": "Dataset ini sudah pernah diunggah dengan nama **{existing}**. "
               "Isinya sama persis, jadi tidak perlu diunggah lagi. Pilih "

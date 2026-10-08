@@ -382,6 +382,13 @@ MIGRATIONS = [
         "description": "Create login_sessions table (login survives refresh)",
         "sql": models.CREATE_LOGIN_SESSIONS_TABLE,
     },
+    {
+        # Pemilik dan visibilitas dataset (publik/privat). Tabel baru; dataset
+        # yang sudah ada tidak punya baris dan karena itu tetap publik.
+        "version": 37,
+        "description": "Create datasets table (owner and visibility)",
+        "sql": models.CREATE_DATASETS_TABLE,
+    },
 ]
 
 CREATE_SCHEMA_VERSION_TABLE = """
