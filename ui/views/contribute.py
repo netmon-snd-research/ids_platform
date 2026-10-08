@@ -3066,7 +3066,7 @@ def _attach_trial_dataset(submission: dict, upload, note: str) -> None:
         info = store_attachment(
             upload, upload.name,
             package_name=_Path(submission["stored_path"]).name, note=note)
-        attach_to_submission(submission["id"], info, actor=user)
+        attach_to_submission(submission["id"], info, actor=current_user())
     except (TrialDatasetError, OSError) as exc:
         # Pengajuannya sendiri SUDAH tercatat; lampiran yang gagal disimpan
         # tidak membatalkannya — peninjau tetap dapat menguji dengan dataset
