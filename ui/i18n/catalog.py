@@ -280,16 +280,11 @@ CATALOG: dict[str, dict[str, str]] = {
     # ditindaklanjuti — untuk tahu dataset apa saja yang ada, satu-satunya
     # jalan adalah membuka dropdown dan membaca baris panjang satu per satu.
     "re.col_dataset_file": {"id": "Berkas", "en": "File"},
-    "re.col_dataset_research": {"id": "Research", "en": "Research"},
     "re.col_dataset_format": {"id": "Format", "en": "Format"},
     "re.col_dataset_size": {"id": "Ukuran", "en": "Size"},
     "re.btn_pick_dataset": {"id": "Pilih", "en": "Select"},
     "re.lbl_search_dataset": {"id": "Cari dataset", "en": "Search datasets"},
-    "re.ph_search_dataset": {"id": "nama berkas atau research",
-                             "en": "file name or research"},
-    "re.lbl_dataset_category": {"id": "Kategori", "en": "Category"},
-    "re.dataset_all_categories": {"id": "Semua research",
-                                  "en": "All research"},
+    "re.ph_search_dataset": {"id": "nama berkas", "en": "file name"},
     "re.dataset_count": {
         "id": "Menampilkan {shown} dari {total} berkas dataset.",
         "en": "Showing {shown} of {total} dataset files."},

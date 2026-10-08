@@ -1251,16 +1251,15 @@ def _all_dataset_options() -> list[tuple[str, str]]:
     return _dataset_catalog()[0]
 
 
-#: Kategori "semua" pada penyaring dataset. Bukan string kosong: nilai kosong
-#: tidak dapat dibedakan dari "belum dipilih" pada selectbox.
-DATASET_ALL = "__all__"
-
 #: Kolom tabel dataset: (kunci label i18n, bobot lebar). Bentuknya mengikuti
 #: antrean peninjauan (`contribute._QUEUE_COLS`) — kolom terakhir tanpa judul,
 #: berisi tombol.
+#:
+#: Tidak ada kolom research. Jenis dataset sebuah berkas platform hanya
+#: DITEBAK dari ekstensinya (setiap `.csv` menjadi HIKARI2021), jadi kolom itu
+#: menyatakan research yang salah untuk setiap CSV penelitian lain.
 _DS_COLS = (
-    ("re.col_dataset_file", 9),
-    ("re.col_dataset_research", 7),
+    ("re.col_dataset_file", 14),
     ("re.col_dataset_format", 3),
     ("re.col_dataset_size", 4),
     ("", 3),
@@ -1330,7 +1329,7 @@ def _type_mismatch(path: str, dataset_type: str) -> bool:
 
 
 def _render_dataset_table(options, sizes) -> None:
-    """Daftar berkas dataset: cari, saring per kategori, lalu pilih satu.
+    """Daftar berkas dataset: cari menurut nama, lalu pilih satu.
 
     Memilih sebuah baris menulis ke kunci widget dropdown di atasnya, bukan ke
     penyimpanan kedua: yang menentukan dataset terpilih tetap satu tempat,
@@ -1340,19 +1339,11 @@ def _render_dataset_table(options, sizes) -> None:
     import html
 
     baris = dataset_rows(options, sizes)
-    kategori = dataset_categories(baris)
 
-    kontrol = st.columns([3, 2])
-    query = kontrol[0].text_input(t("re.lbl_search_dataset"),
-                                  key="ds_query",
-                                  placeholder=t("re.ph_search_dataset"))
-    pilihan = [DATASET_ALL] + kategori
-    kat = kontrol[1].selectbox(
-        t("re.lbl_dataset_category"), pilihan, key="ds_category",
-        format_func=lambda v: (t("re.dataset_all_categories")
-                               if v == DATASET_ALL else v))
+    query = st.text_input(t("re.lbl_search_dataset"), key="ds_query",
+                          placeholder=t("re.ph_search_dataset"))
 
-    cocok = filter_datasets(baris, query, kat)
+    cocok = filter_datasets(baris, query)
 
     # Daftar kosong: tabelnya TIDAK digambar — tabel tanpa baris terbaca
     # seperti kegagalan memuat. Keadaannya tetap dinyatakan oleh baris jumlah
@@ -1379,10 +1370,9 @@ def _render_dataset_table(options, sizes) -> None:
                 # jadi tidak ada nama yang hilang tanpa cara membacanya.
                 sel[0].markdown(f'<span title="{nama}">{nama}</span>',
                                 unsafe_allow_html=True)
-                sel[1].markdown(f'`{html.escape(str(row["dataset_type"]))}`')
-                sel[2].markdown(html.escape(str(row["format"])))
-                sel[3].markdown(html.escape(str(row["size_text"])))
-                if sel[4].button(t("re.btn_pick_dataset"),
+                sel[1].markdown(html.escape(str(row["format"])))
+                sel[2].markdown(html.escape(str(row["size_text"])))
+                if sel[3].button(t("re.btn_pick_dataset"),
                                  key=f"ds_pick_{row['path']}",
                                  use_container_width=True):
                     # DITITIPKAN, bukan ditulis langsung ke kunci widget.
@@ -1423,13 +1413,12 @@ def dataset_rows(options, sizes) -> list[dict]:
     dropdown di atasnya.
     """
     keluar = []
-    for path, dtype in options or []:
+    for path, _dtype in options or []:
         nama = Path(path).name
         ukuran = (sizes or {}).get(path, -1)
         keluar.append({
             "path": path,
             "name": nama,
-            "dataset_type": dtype or "?",
             # Format dibaca dari ekstensinya, bukan dari kontrak dataset:
             # yang ditanyakan kolom ini adalah "berkas ini apa", dan itu
             # jawabannya ada pada namanya sendiri.
@@ -1440,39 +1429,17 @@ def dataset_rows(options, sizes) -> list[dict]:
     return keluar
 
 
-def dataset_categories(rows) -> list[str]:
-    """Jenis dataset yang BENAR-BENAR ada pada daftar, urut dan tanpa kembar.
+def filter_datasets(rows, query: str = "") -> list[dict]:
+    """Saring menurut kata kunci pada nama berkas. MURNI.
 
-    Dibaca dari barisnya, bukan dari registry: menawarkan kategori yang tidak
-    punya satu berkas pun akan menghasilkan penyaring yang selalu kosong.
-    """
-    urut = []
-    for row in rows or []:
-        nilai = str(row.get("dataset_type") or "").strip()
-        if nilai and nilai not in urut:
-            urut.append(nilai)
-    return sorted(urut)
-
-
-def filter_datasets(rows, query: str = "", category: str = DATASET_ALL) -> list[dict]:
-    """Saring menurut kategori lalu kata kunci. MURNI.
-
-    Kata kuncinya dicocokkan pada nama berkas DAN jenis datasetnya: orang yang
-    mengetik "hikari" sedang mencari keduanya, dan memaksanya memilih kategori
-    lebih dulu hanya menambah satu langkah.
+    Hanya nama berkasnya: jenis dataset berkas platform ditebak dari
+    ekstensinya, jadi mencocokkan "hikari" padanya akan menampilkan setiap CSV.
     """
     teks = str(query or "").strip().lower()
-    keluar = []
-    for row in rows or []:
-        if category and category != DATASET_ALL:
-            if str(row.get("dataset_type") or "") != category:
-                continue
-        if teks:
-            gabung = f"{row.get('name', '')} {row.get('dataset_type', '')}".lower()
-            if teks not in gabung:
-                continue
-        keluar.append(row)
-    return keluar
+    if not teks:
+        return list(rows or [])
+    return [row for row in rows or []
+            if teks in str(row.get("name", "")).lower()]
 
 
 def _dataset_sizes() -> dict[str, int]:
