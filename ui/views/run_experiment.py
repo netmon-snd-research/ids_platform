@@ -1773,7 +1773,7 @@ def _render_validation_failure(v: dict, dataset_type: str, *,
     diubah — hanya cara menampilkannya: jumlah + beberapa contoh + daftar penuh
     di dalam expander yang tertutup secara default.
 
-    ``covered``: kotak "Uji kecocokan" sedang tampil, jadi kolom yang kurang
+    ``covered``: daftar "Uji kompatibilitas" sedang tampil, jadi kolom yang kurang
     tidak diulang di sini. Galat lain tetap ditampilkan.
     """
     vr = v.get("validation_result")
@@ -1791,7 +1791,7 @@ def _render_validation_failure(v: dict, dataset_type: str, *,
              if not any(e.startswith(p) for p in _RAW_LIST_ERROR_PREFIXES)]
 
     if missing and covered:
-        # Kotak "Uji kecocokan" di bawah sudah menyatakan berkas ini tidak
+        # Daftar "Uji kompatibilitas" di bawah sudah menyatakan berkas ini tidak
         # cocok di mana pun, dan dialognya merinci kolom yang kurang.
         missing = []
     if missing:
@@ -1947,34 +1947,84 @@ def _maybe_render_compat_dialog(diag: dict) -> None:
     _compat_dialog(diag, dtype)
 
 
+#: Kolom daftar uji kompatibilitas. Sama dengan daftar Kelola Research, dengan
+#: satu tombol di kanan sebagai pengganti kolom status dan aksi pengelolaan.
+_CX_COLS = (
+    ("rs.col_pipeline", 14),
+    ("rs.col_algorithms", 4),
+    ("", 6),
+)
+_CX_QUERY_KEY = "_cx_query"
+
+
 def _render_compat_boxes(diag: dict) -> None:
-    """Kotak per RESEARCH PIPELINE (dataset_type) — bukan per algoritma.
+    """Daftar research pipeline untuk diuji, satu baris per research.
 
     Hanya dipanggil saat tidak ada satu pun pipeline yang cocok otomatis.
-    Tiap kotak: nama + atribusi, ringkasan syarat satu baris, dan tombol "Uji
-    kecocokan" yang membuka dialog hasil untuk pipeline itu saja.
+    Bentuknya sama dengan daftar Kelola Research (judul, kontributor,
+    algoritma), dengan kotak cari; tombol di kanan membuka dialog hasil uji
+    untuk research itu saja. Urutannya: yang paling dekat cocok lebih dulu.
     """
+    import html
+
+    from ui.components.research_manage import (
+        catalog_rows, credit_line, filter_rows,
+    )
+    from ui.components.sections import mobile_card_labels
+
     results = diag.get("results") or {}
     if not results:
         st.warning(diag.get("error") or "Diagnosa kecocokan tidak tersedia.")
         return
 
     st.warning(t("re.msg_no_auto_match"))
-    # Judul research SAJA. Penulis, jenis, dan syarat berkasnya ada di dialog
-    # uji kecocokan dan di katalog; di sini mereka hanya memanjangkan kotak.
-    ordered = _sorted_results(diag)          # yang paling dekat cocok lebih dulu
-    cols = st.columns(len(ordered))
-    for col, (dtype, _result) in zip(cols, ordered):
-        # Gaya pemanggilan lewat objek kolom/container (seperti `cols[0].button`
-        # di ui/views/view_results.py) — tidak masuk ke dalam context manager,
-        # sehingga tombol tidak pernah menjalankan apa pun dari konteks bersarang.
-        box = col.container(border=True)
-        box.markdown(f"**{get_research_title(dtype)}**")
-        if box.button(t("re.btn_compat_test"), key=f"compat_test_{dtype}",
-                      use_container_width=True):
-            # Hanya set flag. Dialog dibuka di alur utama (setelah blok ini)
-            # pada run yang SAMA — tidak perlu st.rerun() dari dalam kotak.
-            _request_compat_check(dtype)
+    try:
+        katalog = {r["dataset_type"]: r for r in catalog_rows()}
+    except Exception:                       # pragma: no cover - defensif
+        katalog = {}
+    semua = [katalog.get(dtype) or {"dataset_type": dtype,
+                                    "full_name": get_research_title(dtype),
+                                    "algorithms": 0}
+             for dtype, _result in _sorted_results(diag)]
+
+    query = st.text_input(t("rs.search"), key=_CX_QUERY_KEY,
+                          placeholder=t("rs.search_ph"),
+                          label_visibility="collapsed")
+    tampil = filter_rows(semua, query)
+    st.markdown(t("rs.count", shown=len(tampil), total=len(semua)))
+    if not tampil:
+        st.info(t("rs.empty"))
+        return
+
+    lebar = [b for _, b in _CX_COLS]
+    mobile_card_labels("ids-cx-row", {2: t("rs.col_algorithms")})
+    with st.container():
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
+                    unsafe_allow_html=True)
+        kepala = st.columns(lebar, vertical_alignment="center")
+        for kol, (kunci, _) in zip(kepala, _CX_COLS):
+            kol.markdown(f"**{t(kunci)}**" if kunci else "")
+
+    for row in tampil:
+        dtype = row["dataset_type"]
+        with st.container(border=True):
+            st.markdown('<span class="ids-queue-row ids-mcard ids-cx-row"></span>',
+                        unsafe_allow_html=True)
+            sel = st.columns(lebar, vertical_alignment="center")
+            judul = html.escape(str(row.get("full_name") or dtype))
+            sub = credit_line(row) if row.get("authors") or row.get("year") else ""
+            sel[0].markdown(
+                f"**{judul}**"
+                + (f'<span class="ids-row-sub">{html.escape(sub)}</span>'
+                   if sub else ""),
+                unsafe_allow_html=True)
+            sel[1].markdown(str(row.get("algorithms", 0)))
+            # Hanya menyimpan pilihan. Dialognya dibuka dari alur utama
+            # (`_maybe_render_compat_dialog`), sesudah daftar ini.
+            if sel[2].button(t("re.btn_compat_test"),
+                             key=f"compat_test_{dtype}",
+                             use_container_width=True):
+                _request_compat_check(dtype)
     if diag.get("malformed_lines"):
         st.warning(f"{diag['malformed_lines']:,} baris pada sampel gagal "
                    f"diparse dan diabaikan.")
@@ -2832,8 +2882,8 @@ def _render_execute():
     # Pipeline di bawah, yang memang terisi hanya oleh pipeline yang cocok.
     no_match = not _any_compatible(_diag)
 
-    # Ringkasan kegagalan validasi: satu baris + daftar tertutup. Bila kotak
-    # "Uji kecocokan" ikut tampil, kolom yang kurang tidak diulang di sini;
+    # Ringkasan kegagalan validasi: satu baris + daftar tertutup. Bila daftar
+    # "Uji kompatibilitas" ikut tampil, kolom yang kurang tidak diulang di sini;
     # cukup satu pesan yang menyatakan berkas ini belum cocok.
     if not v.get("success"):
         _render_validation_failure(v, dataset_type, covered=no_match)
@@ -2988,7 +3038,7 @@ def _render_execute():
                 # Tombol ini berada SESUDAH titik pemanggilan dialog di alur
                 # utama, jadi flag baru terbaca pada run berikutnya — rerun dari
                 # sini sah karena berada di alur utama render().
-                if st.button("Uji kecocokan", key="compat_test_from_run"):
+                if st.button(t("re.btn_compat_test"), key="compat_test_from_run"):
                     _request_compat_check(dataset_type)
                     st.rerun()
             # Gate ketiga: berkas CSV yang taksiran RAM-nya melewati pagu

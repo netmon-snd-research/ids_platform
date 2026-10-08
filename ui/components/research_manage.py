@@ -402,6 +402,15 @@ def _catalog_cached(nonce: int) -> list[dict]:
     return research_catalog()
 
 
+def catalog_rows() -> list[dict]:
+    """Katalog ber-cache yang SAMA dengan daftar ini, untuk halaman lain.
+
+    Dipakai daftar uji kompatibilitas di Jalankan Eksperimen, supaya research
+    yang sama tertulis sama persis di kedua tempat.
+    """
+    return _catalog_cached(st.session_state.get(NONCE_KEY, 0))
+
+
 def active_count() -> int:
     """Berapa research pipeline AKTIF pada daftar ini. Untuk label tab.
 

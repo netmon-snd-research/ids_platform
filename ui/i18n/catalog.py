@@ -331,7 +331,7 @@ CATALOG: dict[str, dict[str, str]] = {
 
     # ── Dialog & sub-tampilan ────────────────────────────────────────────
     "re.dlg_check_detail": {"id": "Rincian pemeriksaan", "en": "Check details"},
-    "re.dlg_compat_test": {"id": "Uji Kecocokan Dataset",
+    "re.dlg_compat_test": {"id": "Uji Kompatibilitas Dataset",
                            "en": "Dataset Compatibility Test"},
     "re.dlg_pipeline_detail": {"id": "Detail Research Pipeline",
                                "en": "Research Pipeline Details"},
@@ -381,7 +381,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.btn_detail": {"id": "Detail", "en": "Details"},
     "re.btn_cancel_exp": {"id": "Batalkan Eksperimen", "en": "Cancel Experiment"},
     "re.btn_use_dataset": {"id": "Pakai dataset ini", "en": "Use this dataset"},
-    "re.btn_compat_test": {"id": "Uji kecocokan", "en": "Test compatibility"},
+    "re.btn_compat_test": {"id": "Uji kompatibilitas", "en": "Test compatibility"},
     "re.btn_recheck": {"id": "Periksa ulang", "en": "Check again"},
     "re.btn_catalog": {"id": "← Katalog", "en": "← Catalog"},
     "re.btn_pick": {"id": "Pilih", "en": "Select"},
