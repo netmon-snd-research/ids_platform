@@ -280,7 +280,7 @@ def platform_dataset_type(dataset_path: str | None) -> str:
         from config.settings import DATASETS_DIR
         from ui.views.run_experiment import _dataset_options_cached
 
-        options, _sizes = _dataset_options_cached(0, str(DATASETS_DIR))
+        options = _dataset_options_cached(0, str(DATASETS_DIR))[0]
         target = Path(dataset_path).resolve()
         for path, dtype in options:
             if Path(path).resolve() == target:

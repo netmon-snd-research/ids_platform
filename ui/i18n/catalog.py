@@ -280,6 +280,7 @@ CATALOG: dict[str, dict[str, str]] = {
     # ditindaklanjuti — untuk tahu dataset apa saja yang ada, satu-satunya
     # jalan adalah membuka dropdown dan membaca baris panjang satu per satu.
     "re.col_dataset_file": {"id": "Berkas", "en": "File"},
+    "re.col_dataset_uploaded": {"id": "Diunggah", "en": "Uploaded"},
     "re.col_dataset_format": {"id": "Format", "en": "Format"},
     "re.col_dataset_size": {"id": "Ukuran", "en": "Size"},
     "re.btn_pick_dataset": {"id": "Pilih", "en": "Select"},

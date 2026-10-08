@@ -596,7 +596,7 @@ def _trial_dataset_options() -> list[tuple[str, str]]:
     from ui.views.run_experiment import _dataset_options_cached
 
     try:
-        options, _sizes = _dataset_options_cached(0, str(DATASETS_DIR))
+        options = _dataset_options_cached(0, str(DATASETS_DIR))[0]
     except Exception:                        # pragma: no cover - defensif
         logger.exception("Daftar dataset uji tidak terbaca")
         return []

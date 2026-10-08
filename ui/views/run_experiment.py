@@ -1215,6 +1215,7 @@ def _dataset_options_cached(nonce: int, root: str):
     del root                                # hanya bagian dari kunci cache
     out: list[tuple[str, str]] = []
     sizes: dict[str, int] = {}
+    mtimes: dict[str, float] = {}
     seen: set[str] = set()
     for dtype in get_available_datasets():
         for p in _list_dataset_files(dtype):
@@ -1222,10 +1223,11 @@ def _dataset_options_cached(nonce: int, root: str):
                 out.append((p, dtype))
                 seen.add(p)
                 try:
-                    sizes[p] = Path(p).stat().st_size
+                    info = Path(p).stat()
+                    sizes[p], mtimes[p] = info.st_size, info.st_mtime
                 except OSError:             # pragma: no cover - defensif
                     sizes[p] = -1
-    return (sorted(out, key=lambda t: Path(t[0]).name.lower()), sizes)
+    return (sorted(out, key=lambda t: Path(t[0]).name.lower()), sizes, mtimes)
 
 
 _DATASET_NONCE_KEY = "_dataset_options_nonce"
@@ -1259,7 +1261,8 @@ def _all_dataset_options() -> list[tuple[str, str]]:
 #: DITEBAK dari ekstensinya (setiap `.csv` menjadi HIKARI2021), jadi kolom itu
 #: menyatakan research yang salah untuk setiap CSV penelitian lain.
 _DS_COLS = (
-    ("re.col_dataset_file", 14),
+    ("re.col_dataset_file", 10),
+    ("re.col_dataset_uploaded", 5),
     ("re.col_dataset_format", 3),
     ("re.col_dataset_size", 4),
     ("", 3),
@@ -1328,8 +1331,8 @@ def _type_mismatch(path: str, dataset_type: str) -> bool:
     return bool(kolom) and not (kolom & diharapkan)
 
 
-def _render_dataset_table(options, sizes) -> None:
-    """Daftar berkas dataset: cari menurut nama, lalu pilih satu.
+def _render_dataset_table(options, sizes, mtimes=None) -> None:
+    """Daftar berkas dataset, terbaru di atas: cari menurut nama, lalu pilih.
 
     Memilih sebuah baris menulis ke kunci widget dropdown di atasnya, bukan ke
     penyimpanan kedua: yang menentukan dataset terpilih tetap satu tempat,
@@ -1338,7 +1341,7 @@ def _render_dataset_table(options, sizes) -> None:
     """
     import html
 
-    baris = dataset_rows(options, sizes)
+    baris = dataset_rows(options, sizes, mtimes)
 
     query = st.text_input(t("re.lbl_search_dataset"), key="ds_query",
                           placeholder=t("re.ph_search_dataset"))
@@ -1370,9 +1373,10 @@ def _render_dataset_table(options, sizes) -> None:
                 # jadi tidak ada nama yang hilang tanpa cara membacanya.
                 sel[0].markdown(f'<span title="{nama}">{nama}</span>',
                                 unsafe_allow_html=True)
-                sel[1].markdown(html.escape(str(row["format"])))
-                sel[2].markdown(html.escape(str(row["size_text"])))
-                if sel[3].button(t("re.btn_pick_dataset"),
+                sel[1].markdown(html.escape(row["uploaded_text"]))
+                sel[2].markdown(html.escape(str(row["format"])))
+                sel[3].markdown(html.escape(str(row["size_text"])))
+                if sel[4].button(t("re.btn_pick_dataset"),
                                  key=f"ds_pick_{row['path']}",
                                  use_container_width=True):
                     # DITITIPKAN, bukan ditulis langsung ke kunci widget.
@@ -1404,21 +1408,35 @@ def _apply_pending_dataset(paths) -> None:
         st.session_state["dataset_select"] = pending
 
 
-def dataset_rows(options, sizes) -> list[dict]:
-    """Baris tabel dataset. MURNI: tanpa Streamlit, tanpa menyentuh disk.
+def dataset_rows(options, sizes, mtimes=None) -> list[dict]:
+    """Baris tabel dataset, TERBARU di atas. MURNI: tanpa Streamlit dan disk.
 
     ``options`` adalah [(path, dataset_type)] apa adanya dari penelusuran
-    folder, dan ``sizes`` peta ukuran dari penelusuran yang SAMA — jadi tabel
-    ini tidak menambah satu pun pembacaan berkas di luar yang sudah dilakukan
-    dropdown di atasnya.
+    folder, dan ``sizes``/``mtimes`` peta ukuran dan waktu tulis terakhir dari
+    penelusuran yang SAMA — jadi tabel ini tidak menambah satu pun pembacaan
+    berkas di luar yang sudah dilakukan dropdown di atasnya.
+
+    Waktu tulis terakhir adalah saat unggahan SELESAI: berkas hasil unggahan
+    dipindahkan apa adanya, bukan ditulis ulang. Berkas tanpa waktu diletakkan
+    paling bawah; waktu yang sama diurutkan menurut nama.
     """
+    from datetime import datetime, timezone
+
+    from ui.components.tables import human_datetime
+
     keluar = []
     for path, _dtype in options or []:
         nama = Path(path).name
         ukuran = (sizes or {}).get(path, -1)
+        mtime = (mtimes or {}).get(path)
+        # UTC, seperti setiap waktu lain di platform ini (utils/timestamps).
+        iso = (datetime.fromtimestamp(mtime, timezone.utc).isoformat()
+               if mtime is not None else "")
         keluar.append({
             "path": path,
             "name": nama,
+            "mtime": mtime,
+            "uploaded_text": human_datetime(iso) if iso else "-",
             # Format dibaca dari ekstensinya, bukan dari kontrak dataset:
             # yang ditanyakan kolom ini adalah "berkas ini apa", dan itu
             # jawabannya ada pada namanya sendiri.
@@ -1426,6 +1444,8 @@ def dataset_rows(options, sizes) -> list[dict]:
             "size": ukuran,
             "size_text": format_size(ukuran) if ukuran >= 0 else "-",
         })
+    keluar.sort(key=lambda r: (r["mtime"] is None, -(r["mtime"] or 0),
+                               r["name"].lower()))
     return keluar
 
 
@@ -1449,6 +1469,11 @@ def _dataset_sizes() -> dict[str, int]:
     jumlah `stat` per render sama dengan jumlah berkas dataset.
     """
     return _dataset_catalog()[1]
+
+
+def _dataset_mtimes() -> dict[str, float]:
+    """{path: waktu tulis terakhir} dari penelusuran folder yang SAMA."""
+    return _dataset_catalog()[2]
 
 
 def _dataset_catalog():
@@ -2826,7 +2851,7 @@ def _render_execute():
         # angka yang tidak dapat ditindaklanjuti: untuk tahu dataset apa saja
         # yang ada, satu-satunya jalan adalah membuka dropdown di atas dan
         # membaca lima baris panjang berisi nama, jenis, dan ukuran sekaligus.
-        _render_dataset_table(_ds_options, _sizes)
+        _render_dataset_table(_ds_options, _sizes, _dataset_mtimes())
         return
 
     dataset_type = _path_to_type.get(dataset_path, "")
