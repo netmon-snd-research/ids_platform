@@ -7,11 +7,13 @@ __pycache__/
 .idea/
 .vscode/
 *.db
-storage/datasets/*.csv
-storage/datasets/*.jsonl
-storage/datasets/*.json
-storage/datasets/*.ndjson
-storage/artifacts/
+# SELURUH storage/, bukan hanya dataset. Saat berjalan folder ini ditimpa
+# bind-mount `./storage:/app/storage`, dan Dockerfile membuat foldernya
+# sendiri, jadi image tidak butuh apa pun darinya. Tanpa ini `COPY . .`
+# menyalin potongan unggahan (_upload_tmp/, sampai 20 GB per berkas),
+# storage/tmp/, dan experiments.db-wal ke DUA image pada setiap build, dan
+# `chown -R` menyalinnya sekali lagi; disk server penuh di tengah build.
+storage/
 docker-compose.yml
 .dockerignore
 .env
