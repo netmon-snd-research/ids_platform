@@ -456,9 +456,18 @@ never written to logs.
 This is authentication for an **internal, controlled deployment** — not a
 public-facing application:
 
-- Streamlit has no real server-side session store. The signed-in identity lives
-  in `st.session_state`, so **refreshing the page logs you out** and the login
-  state is per browser tab. No cookies or persistent tokens are used.
+- Signing in survives a page refresh. On login the app stores a session in the
+  `login_sessions` table (SHA-256 of a random token, never the token itself)
+  and sets an `HttpOnly`, `SameSite=Lax` cookie `ids_session` through its own
+  `/ids-auth` route (`orchestrator/login_session.py`); `Secure` is added when
+  the request arrives over HTTPS (`X-Forwarded-Proto` from the proxy). A new
+  Streamlit session restores the identity from that cookie, re-reading role and
+  status from the `users` table. Sessions expire 7 days after login and are
+  revoked on sign-out, on a password change or reset (other browsers), and when
+  an account is disabled. The cookie is shared by every tab of one browser.
+  The `/ids-auth` route only exists when the app is started via `ui/serve.py`
+  (as in Docker); with `streamlit run ui/app.py` login works but does not
+  survive a refresh.
 - Streamlit provides no CSRF protection, and the container image sets
   `enableXsrfProtection = false`.
 - There is no transport encryption by default; put the app behind a reverse

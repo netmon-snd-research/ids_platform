@@ -518,7 +518,8 @@ def _store_password(username: str, password: str, db_path: str | None) -> dict:
 
 
 def change_password(username: str, current: str, new: str, confirm: str,
-                    db_path: str | None = None) -> dict:
+                    db_path: str | None = None, *,
+                    keep_session: str | None = None) -> dict:
     """Ganti sandi sendiri. Sandi LAMA wajib benar.
 
     Sebelum ini platform sama sekali tidak punya jalur ganti sandi: satu-satunya
@@ -527,6 +528,10 @@ def change_password(username: str, current: str, new: str, confirm: str,
 
     Sandi lama yang salah TIDAK mengubah apa pun, dan sandi mentah tidak pernah
     masuk log.
+
+    Sesi login lain milik akun ini dicabut: browser yang masih memegang cookie
+    lama harus masuk dengan sandi baru. ``keep_session`` adalah sesi yang
+    sedang dipakai mengganti sandi, yang tetap dibiarkan masuk.
     """
     # Barisnya dibaca LANGSUNG: `get_user` sengaja membuang `password_hash`
     # supaya hash tidak pernah sampai ke tampilan, jadi ia tidak dapat dipakai
@@ -542,6 +547,8 @@ def change_password(username: str, current: str, new: str, confirm: str,
                         key="err.old_password_wrong")
     _check_new_password(new, confirm)
     hasil = _store_password(username, new, db_path)
+    from orchestrator.login_session import revoke_user
+    revoke_user(username, keep=keep_session, db_path=db_path)
     logger.info("Sandi diganti sendiri oleh %s", username)
     return hasil
 
@@ -571,6 +578,8 @@ def reset_password(username: str, new: str, confirm: str, *,
                         key="err.reset_self")
     _check_new_password(new, confirm)
     hasil = _store_password(target, new, db_path)
+    from orchestrator.login_session import revoke_user
+    revoke_user(target, db_path=db_path)
     # Perbuatan yang tercatat: siapa mereset milik siapa, dan kapan. Sandi
     # sementaranya sendiri tidak pernah ikut.
     logger.info("Sandi %s direset oleh %s", target, actor["username"])
@@ -621,6 +630,9 @@ def set_user_status(username: str, status: str, *, actor: dict | None,
         conn.commit()
     finally:
         conn.close()
+    if status != STATUS_ACTIVE:
+        from orchestrator.login_session import revoke_user
+        revoke_user(username, db_path=db_path)
     logger.info("Status akun %s -> %s oleh %s", username, status,
                 (actor or {}).get("username"))
     return get_user(username, db_path)

@@ -375,6 +375,13 @@ MIGRATIONS = [
         "sql": "ALTER TABLE experiments ADD COLUMN device_id TEXT",
         "add_column": ("experiments", "device_id"),
     },
+    {
+        # Sesi login yang bertahan saat halaman dimuat ulang. Tabel baru,
+        # tidak menyentuh data lama (lihat orchestrator/login_session.py).
+        "version": 36,
+        "description": "Create login_sessions table (login survives refresh)",
+        "sql": models.CREATE_LOGIN_SESSIONS_TABLE,
+    },
 ]
 
 CREATE_SCHEMA_VERSION_TABLE = """

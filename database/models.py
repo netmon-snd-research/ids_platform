@@ -328,7 +328,24 @@ TRIAL_PASSED = "PASSED"
 TRIAL_FAILED = "FAILED"
 
 
+# Sesi login yang bertahan saat halaman dimuat ulang (lihat
+# orchestrator/login_session.py). `id` adalah pengenal sesi yang dipegang
+# halaman untuk mencabutnya; `token_hash` adalah SHA-256 dari token di cookie
+# `ids_session` — token mentahnya tidak pernah disimpan. `expires_at` berupa
+# detik epoch supaya pembandingannya tidak bergantung pada format teks waktu.
+CREATE_LOGIN_SESSIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS login_sessions (
+    id          TEXT PRIMARY KEY,
+    token_hash  TEXT NOT NULL UNIQUE,
+    username    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  REAL NOT NULL
+);
+"""
+
+
 ALL_TABLES = [CREATE_EXPERIMENTS_TABLE, CREATE_USERS_TABLE,
               CREATE_SUBMISSIONS_TABLE, CREATE_REGISTERED_PIPELINES_TABLE,
               CREATE_PIPELINE_TRIALS_TABLE,
-              CREATE_RESEARCH_PIPELINES_TABLE]
+              CREATE_RESEARCH_PIPELINES_TABLE,
+              CREATE_LOGIN_SESSIONS_TABLE]

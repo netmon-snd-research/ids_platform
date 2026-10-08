@@ -143,7 +143,10 @@ st.markdown(
 # dilakukan siapa saja; yang dibatasi hanyalah aksi berisiko (unggah/setujui/
 # kelola pengguna), diperiksa di titik aksinya masing-masing lewat
 # orchestrator.auth_service. Switch mode dirender setelah menu halaman.
-from ui.views.login import maybe_render_auth_dialog, render_mode_switch
+from ui.views.login import (
+    maybe_render_auth_dialog, render_mode_switch, render_session_cookie,
+    restore_login,
+)
 from ui.components import theme
 from ui.components.sidebar_progress import render_sidebar_progress
 from ui.components.sidebar_chrome import menu_styles, render_breadcrumb
@@ -155,6 +158,11 @@ from ui.i18n import t
 # ui/components/theme.py dan disuntikkan di sini saja, sehingga tidak ada
 # salinan CSS yang tersebar di berkas view.
 theme.inject()
+
+# Pulihkan login dari cookie sesi SEBELUM apa pun membaca identitas (sidebar
+# progres, pemilih mode, halaman). Hanya bekerja pada run pertama sebuah sesi
+# Streamlit, yaitu setelah refresh atau di tab baru.
+restore_login()
 
 # ── Sidebar navigation ────────────────────────────────────────────────────
 # Centralised routing: option_menu returns the selected label, and a single
@@ -298,6 +306,8 @@ render_mode_switch()
 # boleh menggeser apa pun (lihat ui/components/device.py).
 with st.sidebar:
     render_device_cookie()
+    # Cookie sesi login: dipasang setelah masuk, dibuang setelah keluar.
+    render_session_cookie()
 
 # Modal masuk/daftar dipanggil dari ALUR UTAMA — di luar blok `with st.sidebar`
 # dan bukan dari callback, sesuai pola dialog yang sudah bekerja di halaman

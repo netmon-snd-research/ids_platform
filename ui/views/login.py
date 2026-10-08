@@ -8,13 +8,15 @@ dataset/pipeline, menyetujui, mengelola pengguna) — penegakannya ada di
 ``orchestrator/auth_service`` dan dipanggil baik oleh UI maupun oleh fungsi
 aksinya.
 
-Session SEDERHANA: identitas hanya hidup di ``st.session_state`` (refresh =
-kembali jadi pengunjung). Tidak ada cookie/token persisten. Yang disimpan hanya
-`username` dan `role` — password mentah maupun hash TIDAK PERNAH masuk
-session_state.
+Identitas hidup di ``st.session_state`` dan BERTAHAN saat refresh lewat cookie
+``HttpOnly`` ``ids_session`` (lihat ``orchestrator/login_session``): sesi
+Streamlit baru memulihkannya dari cookie itu. Yang disimpan di session_state
+hanya `username`, `role`, `status`, dan pengenal sesinya — password mentah,
+hash, maupun token cookie TIDAK PERNAH masuk session_state.
 """
 from __future__ import annotations
 
+import logging
 import time
 
 import streamlit as st
@@ -36,6 +38,18 @@ from orchestrator.auth_service import (
 )
 
 SESSION_USER_KEY = "auth_user"
+# Pengenal sesi login di basis data, untuk mencabutnya saat keluar.
+_SESSION_SID_KEY = "_auth_sid"
+# Kode tukar sekali pakai yang menunggu ditukar komponen cookie menjadi cookie.
+_CLAIM_KEY = "_auth_claim"
+# Diisi setelah keluar: komponen cookie membuang cookie sesi dari peramban.
+# Nilainya pengenal sesi yang keluar ("-" bila tidak ada), supaya rutenya
+# tidak membuang cookie login yang lebih baru milik tab lain.
+_COOKIE_CLEAR_KEY = "_auth_cookie_clear"
+# Pemulihan dari cookie hanya dicoba SEKALI per sesi Streamlit. Tanpa penanda
+# ini, keluar akan langsung dibatalkan oleh pemulihan pada rerun berikutnya
+# (cookie yang dibaca `st.context` tetap cookie saat sesi dibuka).
+_RESTORE_TRIED_KEY = "_auth_restore_tried"
 _ATTEMPTS_KEY = "_auth_failed_attempts"
 _SIGNUP_ATTEMPTS_KEY = "_auth_signup_attempts"
 _SIGNUP_DONE_KEY = "_auth_signup_done"
@@ -168,6 +182,19 @@ def logout() -> None:
     ulang nilainya dari mode nyata pada render berikutnya, dan menghapus kunci
     widget yang masih hidup justru memicu galat Streamlit.
     """
+    # Sesi login di basis data dicabut LANGSUNG dari sini, tidak menunggu
+    # komponen cookie: bila iframe-nya tidak sempat berjalan, cookie yang
+    # tersisa di peramban sudah tidak menunjuk ke sesi mana pun.
+    from orchestrator.login_session import revoke
+    sid = st.session_state.pop(_SESSION_SID_KEY, None)
+    try:
+        revoke(sid)
+    except Exception:                       # pragma: no cover - defensif
+        logging.getLogger(__name__).warning("Sesi login gagal dicabut",
+                                            exc_info=True)
+    st.session_state.pop(_CLAIM_KEY, None)
+    st.session_state[_COOKIE_CLEAR_KEY] = sid or "-"
+    st.session_state[_RESTORE_TRIED_KEY] = True
     st.session_state.pop(SESSION_USER_KEY, None)
     st.session_state.pop(_ATTEMPTS_KEY, None)
     st.session_state.pop(_SIGNUP_ATTEMPTS_KEY, None)
@@ -178,8 +205,86 @@ def logout() -> None:
     close_auth_dialog()
 
 
+def _set_identity(user: dict) -> None:
+    """Simpan identitas tampilan. HANYA username, peran, dan status.
+
+    `status` ikut disimpan supaya TAMPILAN tahu akun ini masih menunggu
+    persetujuan (kontrol unggah ikut mati). Lapis aksi tetap membaca ulang
+    status dari DB, jadi salinan ini tidak pernah menjadi otoritas.
+    """
+    st.session_state[SESSION_USER_KEY] = {
+        "username": user["username"],
+        "role": user["role"],
+        "status": user["status"],
+    }
+
+
+def restore_login() -> None:
+    """Pulihkan identitas dari cookie sesi. Dipanggil ui/app.py tiap run.
+
+    Hanya bekerja sekali per sesi Streamlit, yaitu pada run pertamanya
+    (refresh atau tab baru). Peran dan status dibaca ulang dari basis data
+    oleh ``login_session.resolve``, bukan dari cookie.
+    """
+    if st.session_state.get(_RESTORE_TRIED_KEY):
+        return
+    st.session_state[_RESTORE_TRIED_KEY] = True
+    if current_user() is not None:
+        return
+    from orchestrator.login_session import COOKIE_NAME, resolve
+    try:
+        token = st.context.cookies.get(COOKIE_NAME)
+    except Exception:                       # pragma: no cover - defensif
+        token = None
+    if not token:
+        return
+    try:
+        found = resolve(token)
+    except Exception:                       # pragma: no cover - DB belum siap
+        logging.getLogger(__name__).warning("Sesi login tidak dapat dipulihkan",
+                                            exc_info=True)
+        return
+    if found is None:
+        # Kedaluwarsa atau dicabut: buang cookie basinya dari peramban.
+        st.session_state[_COOKIE_CLEAR_KEY] = "-"
+        return
+    user, sid = found
+    _set_identity(user)
+    st.session_state[_SESSION_SID_KEY] = sid
+
+
+def render_session_cookie() -> None:
+    """Pasang atau buang cookie sesi lewat rute ``/ids-auth``. Dipanggil ui/app.py.
+
+    Cookie-nya ``HttpOnly``, jadi tidak dapat ditulis dari JavaScript seperti
+    cookie device. Komponen ini hanya mengirim KODE TUKAR sekali pakai; rute
+    HTTP-lah yang memasang cookie-nya. Isi komponen sama di setiap run selama
+    keadaannya tidak berubah, jadi Streamlit memakai ulang iframe yang sama
+    dan request-nya terkirim sekali. Bila iframe dimuat ulang, kode yang
+    sudah terpakai hanya ditolak; cookie yang sudah terpasang tidak tersentuh.
+    """
+    from orchestrator.login_session import GUARD_HEADER, ROUTE_PREFIX
+
+    code = st.session_state.get(_CLAIM_KEY)
+    if code:
+        script = (f"fetch('{ROUTE_PREFIX}/claim', {{method: 'POST', "
+                  f"credentials: 'same-origin', headers: {{'Content-Type': "
+                  f"'application/json', '{GUARD_HEADER}': '1'}}, "
+                  f"body: JSON.stringify({{code: '{code}'}})}});")
+    elif st.session_state.get(_COOKIE_CLEAR_KEY):
+        sid = st.session_state[_COOKIE_CLEAR_KEY]
+        script = (f"fetch('{ROUTE_PREFIX}/session?sid={sid}', "
+                  f"{{method: 'DELETE', "
+                  f"credentials: 'same-origin', headers: {{'{GUARD_HEADER}': "
+                  f"'1'}}}});")
+    else:
+        return
+    import streamlit.components.v1 as components
+    components.html(f"<script>{script}</script>", height=0)
+
+
 def _attempt_login(username: str, password: str) -> bool:
-    """True bila berhasil. Menyimpan HANYA username & role."""
+    """True bila berhasil. Menyimpan HANYA username, role, dan status."""
     attempts = int(st.session_state.get(_ATTEMPTS_KEY, 0))
     if attempts >= _THROTTLE_AFTER:
         time.sleep(_THROTTLE_SECONDS)
@@ -189,14 +294,20 @@ def _attempt_login(username: str, password: str) -> bool:
         st.session_state[_ATTEMPTS_KEY] = attempts + 1
         return False
 
-    # `status` ikut disimpan supaya TAMPILAN tahu akun ini masih menunggu
-    # persetujuan (kontrol unggah ikut mati). Lapis aksi tetap membaca ulang
-    # status dari DB, jadi salinan ini tidak pernah menjadi otoritas.
-    st.session_state[SESSION_USER_KEY] = {
-        "username": user["username"],
-        "role": user["role"],
-        "status": user["status"],
-    }
+    _set_identity(user)
+    # Sesi yang bertahan saat refresh. Kode tukarnya ditukar menjadi cookie
+    # oleh `render_session_cookie`; gagal di sini hanya berarti login tidak
+    # bertahan saat refresh, bukan login yang gagal.
+    from orchestrator.login_session import mint_claim
+    try:
+        sid, code = mint_claim(user["username"])
+    except Exception:                       # pragma: no cover - defensif
+        logging.getLogger(__name__).warning("Sesi login tidak dibuat",
+                                            exc_info=True)
+    else:
+        st.session_state[_SESSION_SID_KEY] = sid
+        st.session_state[_CLAIM_KEY] = code
+        st.session_state.pop(_COOKIE_CLEAR_KEY, None)
     st.session_state.pop(_ATTEMPTS_KEY, None)
     # Jangan tinggalkan password yang barusan diketik di session_state; formulir
     # tidak dirender lagi setelah ini, jadi nilainya tidak dibutuhkan.
@@ -401,7 +512,8 @@ def _render_change_password(user: dict) -> None:
     if st.button(t("auth.btn_save_password"), key="auth_pw_save",
                  type="primary", use_container_width=True):
         try:
-            change_password(user.get("username") or "", lama, baru, ulang)
+            change_password(user.get("username") or "", lama, baru, ulang,
+                            keep_session=st.session_state.get(_SESSION_SID_KEY))
         except AuthError as e:
             st.error(error_message(e))
         else:
