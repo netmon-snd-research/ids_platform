@@ -885,6 +885,19 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     background-color: inherit;
     padding-bottom: 1rem;
 }}
+/* Daftar eksperimen berjalan (wadah bergulir di sidebar, kunci
+   `ids_run_scroll`) mengisi ruang sampai sedikit di atas garis blok akun,
+   bukan berhenti di 210 px. Angkanya diukur: puncak daftar 323 px dari atas
+   (logo + menu), garis blok akun yang menempel 240 px dari dasar, sisakan
+   ±17 px. Daftar yang isinya lebih pendek berhenti di kartu terakhirnya. Di layar
+   pendek tingginya tetap minimal 210 px; blok akun yang menempel menutup
+   ujungnya, dan isinya tetap dapat digulir. */
+/* Tingginya dipatok Streamlit pada PEMBUNGKUS (stLayoutWrapper), bukan pada
+   wadah berkuncinya; keduanya diatur supaya wadah dalam ikut memanjang. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-ids_run_scroll),
+.st-key-ids_run_scroll {{
+    height: max(210px, calc(100vh - 580px)) !important;
+}}
 .ids-mode-anchor {{ display: none; }}
 
 /* ── Chip katalog: penanda asal & keadaan ──────────────────────────────── */

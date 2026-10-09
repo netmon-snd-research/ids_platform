@@ -371,7 +371,7 @@ def render_progress_block() -> None:
     # Menggulir SENDIRI begitu kartunya lebih dari dua. Tanpa itu, empat run
     # mendorong pengalih bahasa dan pemilih peran keluar dari pandangan —
     # navigasi kalah oleh sesuatu yang hanya berlangsung beberapa menit.
-    wadah = (st.container(height=SCROLL_HEIGHT, border=False)
+    wadah = (st.container(height=SCROLL_HEIGHT, border=False, key="ids_run_scroll")
              if len(rows) > VISIBLE_CARDS else st.container())
     with wadah:
         for row in rows:
