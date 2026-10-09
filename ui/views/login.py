@@ -396,7 +396,8 @@ def render_mode_switch() -> None:
         # atasnya. Blok ini juga HARUS dirender terakhir — lihat ui/app.py.
         with st.container():
             st.markdown(_MODE_ANCHOR, unsafe_allow_html=True)
-            st.divider()
+            # Tanpa garis pemisah: blok ini sudah terpisah karena menempel di
+            # dasar sidebar.
             user = current_user()
 
             if st.session_state.pop(_SIGNUP_DONE_KEY, False):

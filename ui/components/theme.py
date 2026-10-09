@@ -901,8 +901,7 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 .ids-mode-anchor {{ display: none; }}
 /* Blok akun lebih RAPAT. Dua penanda tak terlihat (jangkar & label mode)
    masing-masing menempati satu pembungkus setinggi 0 px yang tetap dikenai
-   celah 16 px; pembungkusnya disembunyikan dan celahnya dikecilkan. Garis
-   pemisahnya juga tidak lagi memakan ±49 px. */
+   celah 16 px; pembungkusnya disembunyikan dan celahnya dikecilkan. */
 [data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) > [data-testid="stVerticalBlock"] {{
     gap: .5rem;
 }}
@@ -910,7 +909,6 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 [data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) .stElementContainer:has(.ids-mode-label) {{
     display: none;
 }}
-[data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) hr {{ margin: .25rem 0 .5rem; }}
 
 /* Kartu eksperimen berjalan: pembungkus markdown Streamlit bermargin bawah
    -16 px, sehingga kotak kartu meluber 16 px keluar wadahnya dan kartu

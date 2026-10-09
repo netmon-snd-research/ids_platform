@@ -58,12 +58,14 @@ def _logo_data_uri() -> str:
 def brand_html() -> str:
     """Logo + nama aplikasi untuk puncak sidebar."""
     uri = _logo_data_uri()
-    logo = (f'<img src="{uri}" width="24" height="24" alt="" '
+    logo = (f'<img src="{uri}" width="32" height="32" alt="" '
             f'style="flex:0 0 auto;">' if uri else "")
-    return (f'<div style="display:flex;align-items:center;gap:.5rem;'
-            f'padding:2px 0 2px {INSET_PX}px;">{logo}'
-            f'<span style="font-size:1.05rem;font-weight:700;'
-            f'letter-spacing:.01em;">{escape(APP_NAME)}</span></div>')
+    # Ditarik ke atas (margin negatif) supaya merek berdiri sejajar dengan
+    # bilah tombol sidebar, bukan mengambang di bawahnya.
+    return (f'<div style="display:flex;align-items:center;gap:.6rem;'
+            f'margin-top:-2rem;padding:2px 0 2px {INSET_PX}px;">{logo}'
+            f'<span style="font-size:1.35rem;font-weight:700;'
+            f'letter-spacing:.01em;line-height:1.2;">{escape(APP_NAME)}</span></div>')
 
 
 def render_brand() -> None:
