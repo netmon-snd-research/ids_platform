@@ -989,7 +989,7 @@ def _render_running_section(experiments) -> list:
         with st.container(border=True):
             st.markdown('<span class="ids-queue-row ids-dash-run"></span>',
                         unsafe_allow_html=True)
-            kiri, tengah, kanan = st.columns([4, 6, 2],
+            kiri, tengah, kanan = st.columns([8, 12, 1],
                                              vertical_alignment="center")
             nama = escape(et.pipeline_label(e.get("pipeline_id"),
                                               _pipeline_names()))
@@ -1007,8 +1007,8 @@ def _render_running_section(experiments) -> list:
                 f'<div class="ids-run-foot"><span class="ids-run-phase">'
                 f'{escape(str(fase))}</span>{persen}</div>{bilah}',
                 unsafe_allow_html=True)
-            if kanan.button(t("ps.btn_cancel_short"), key=f"dash_cancel_{eid}",
-                            use_container_width=True):
+            if kanan.button(":material/close:", key=f"dash_cancel_{eid}",
+                            type="tertiary", help=t("ps.btn_cancel_short")):
                 r = cancel_experiment(eid)
                 if r.get("success"):
                     st.warning(t("ps.msg_cancelled"))

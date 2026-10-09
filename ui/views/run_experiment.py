@@ -27,7 +27,6 @@ from config.settings import DATASETS_DIR
 from orchestrator.research_registry import (
     attribution_for as get_research_attribution,
     display_name_for as get_research_display_name,
-    short_label_for as get_research_short_label,
     title_for as get_research_title,
 )
 from ui.views._artifact_browser import render_file_browser, format_size
@@ -2479,34 +2478,28 @@ def _use_dataset(dataset_type: str, path: str) -> None:
 
 
 def _catalog_run_body(dataset_type: str, matches: list[dict]) -> None:
-    """Isi pop-up. Hanya MEMBACA hasil yang sudah dihitung saat dibuka."""
+    """Isi pop-up. Hanya MEMBACA hasil yang sudah dihitung saat dibuka.
+
+    Ringkas: judul research, lalu satu baris per dataset (nama · ukuran,
+    Pilih). Kalimat pengantar, garis pemisah, dan tombol Tutup dibuang;
+    tombol ✕ dialognya sudah menutup.
+    """
     from ui.components.pipeline_catalog import run_requirements
 
-    st.markdown(f"**{get_research_short_label(dataset_type)}**")
+    st.markdown(f"**{get_research_title(dataset_type)}**")
 
     if matches:
-        st.caption(t("re.msg_n_datasets_match", count=len(matches)))
         for item in matches:
-            cols = st.columns([5, 2])
-            cols[0].markdown(f"`{item['name']}`")
-            cols[0].caption(item["size"])
-            if cols[1].button("Pilih", key=f"catrun_{item['path']}",
+            cols = st.columns([5, 1], vertical_alignment="center")
+            cols[0].markdown(f"{item['name']} · {item['size']}")
+            if cols[1].button(t("re.btn_pick_dataset"), key=f"catrun_{item['path']}",
                               use_container_width=True):
                 _use_dataset(dataset_type, item["path"])
                 st.rerun()
     else:
-        st.warning(t("re.empty_no_dataset_for_pipeline"))
-        st.markdown("**Syarat utamanya**")
+        st.markdown(t("re.empty_no_dataset_for_pipeline"))
         for label, value in run_requirements(dataset_type):
             st.markdown(f"- **{label}** · {value}")
-        st.caption("Unggah dataset yang memenuhi syarat di atas lewat halaman "
-                   "**Add Pipeline & Dataset**; berkasnya diperiksa otomatis "
-                   "terhadap tiap research pipeline setelah diunggah.")
-
-    st.divider()
-    if st.button("Tutup", key="_catalog_run_close"):
-        close_catalog_run()
-        st.rerun()
 
 
 if hasattr(st, "dialog"):
@@ -2963,7 +2956,7 @@ def _render_execute():
         algo = info.get("algorithm") or info.get("name", pid)
         research_groups.setdefault(dt, {})[algo] = pid
         if dt not in research_display:
-            research_display[dt] = get_research_display_name(dt)
+            research_display[dt] = get_research_title(dt)
 
     # Pilihan yang dibawa dari KATALOG diterapkan di sini — sesudah
     # research_groups diketahui, sehingga hanya pipeline yang memang kompatibel
@@ -3138,61 +3131,32 @@ def _render_execute():
         _display_results(st.session_state["last_result"])
 
 
-# Tahapan besar pipeline EVE cbr (14 fase, dikelompokkan agar jelas & jujur).
-# Hanya ditampilkan untuk pipeline EVE (eve_cbr.*) — bukan HIKARI.
-_EVE_PHASE_LINES = [
-    "Memisahkan trafik TLS dari dataset EVE",
-    "Profiling & analisis probing",
-    "Refinement label konservatif (cap konversi baris)",
-    "Konstruksi & pembersihan fitur",
-    "Screening korelasi & leakage",
-    "Feature selection (MI / RFE / PCA, train-only)",
-    "Pelatihan & evaluasi dual-holdout (natural + balanced)",
-]
-
-
-def _phase_checklist(icon: str) -> str:
-    return "\n".join(f"- {icon} {p}" for p in _EVE_PHASE_LINES)
-
-
 def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
                      run_mode: str | None = None,
                      param_overrides: dict | None = None) -> None:
-    """Dispatch the experiment with a live status block.
+    """Kirim eksperimen, lalu serahkan tampilan ke pemantauan.
 
-    Sync mode (USE_ASYNC=false): create_and_run_experiment blocks until the
-    pipeline finishes, so the checklist sits on during the run and flips
-    to when the call returns.
+    TANPA kotak status. Dahulu kotak "Running pipeline…" berisi baris
+    persiapan, daftar fase EVE, dan catatan log, lalu berganti "Dispatched to
+    worker" sekejap sebelum halaman beralih ke pemantauan: keterangan yang
+    tidak dibutuhkan siapa pun, karena tampilan pemantauan menyusul seketika.
 
-    Async mode: the call returns immediately after dispatching the Celery
-    task. We transition to the polling view, which handles its own UI.
+    Mode asinkron (deployment): panggilan kembali begitu tugas masuk antrean,
+    lalu halaman beralih ke pemantauan. Mode sinkron (pengembangan lokal,
+    USE_ASYNC=false): panggilan menunggu sampai pipeline selesai, jadi
+    pemintal ditampilkan selama itu.
     """
-    # The EVE phase checklist describes the cbr (EVE) pipeline stages, so show
-    # it only for EVE pipelines. HIKARI pipelines get a generic line instead —
-    # never the EVE phase names.
-    is_eve = (dataset_type == "EVE_SURICATA") or (pipeline_id or "").startswith("eve_cbr")
-    with st.status("Running pipeline...", expanded=True) as status_box:
-        st.write("Initializing experiment...")
-        st.write("Parsing and validating dataset...")
-        st.write("")
-        phase_placeholder = None
-        if is_eve:
-            st.write("**Tahapan pipeline cbr (EVE) akan dijalankan berurutan:**")
-            phase_placeholder = st.empty()
-            phase_placeholder.markdown(_phase_checklist("[ ]"))
-            st.write("")
-        else:
-            st.write("Pipeline dijalankan; metrik dan artefak muncul setelah selesai.")
-        st.info(t("re.msg_log_later"))
+    # Owner = username bila ada yang masuk, None bila mode pengunjung;
+    # device_id = pengenal browser ini. Keduanya tidak diteruskan ke
+    # worker/pipeline; dipakai hanya agar run tampil bagi pemiliknya
+    # (ui/components/device.py).
+    from ui.components.device import viewer_identity
+    from ui.components.validator_messages import run_error_text
 
-        # Owner = username bila ada yang masuk, None bila mode pengunjung;
-        # device_id = pengenal browser ini. Keduanya tidak diteruskan ke
-        # worker/pipeline; dipakai hanya agar run yang sedang berjalan tampil
-        # di device dan akun pemiliknya saja (ui/components/device.py).
-        from ui.components.device import viewer_identity
-        # run_mode None = run RESMI (bawaan orchestrator). param_overrides
-        # dibuang orchestrator pada run resmi, jadi tidak ada jalur di sini yang
-        # bisa menyelinapkan nilai yang diubah ke dalam run resmi.
+    # run_mode None = run RESMI (bawaan orchestrator). param_overrides
+    # dibuang orchestrator pada run resmi, jadi tidak ada jalur di sini yang
+    # bisa menyelinapkan nilai yang diubah ke dalam run resmi.
+    with st.spinner(""):
         result = create_and_run_experiment(
             dataset_type, dataset_path, pipeline_id,
             run_mode=run_mode,
@@ -3200,25 +3164,14 @@ def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
             **viewer_identity(),
         )
 
-        if not result["success"]:
-            status_box.update(label="Pipeline failed", state="error")
-            from ui.components.validator_messages import run_error_text
-            st.error(run_error_text(result["error"]))
-            return
-
-        if result.get("async_mode"):
-            status_box.update(label="Dispatched to worker", state="running")
-            st.session_state["polling_experiment_id"] = result["experiment_id"]
-            st.info(f"Experiment queued: `{result['experiment_id'][:8]}...`")
-            st.rerun()
-            return
-
-        # Sync path completed successfully
-        if phase_placeholder is not None:
-            phase_placeholder.markdown(_phase_checklist("[x]"))
-        status_box.update(label="Pipeline complete!", state="complete")
+    if not result["success"]:
+        st.error(run_error_text(result["error"]))
+        return
+    if result.get("async_mode"):
+        st.session_state["polling_experiment_id"] = result["experiment_id"]
+    else:
         st.session_state["last_result"] = result
-        st.rerun()
+    st.rerun()
 
 
 def _poll_experiment(experiment_id: str):
@@ -3256,7 +3209,7 @@ def _poll_experiment(experiment_id: str):
             _ringkas += f" · {_pb['elapsed_text']}"
         if status == "QUEUED":
             _ringkas = t("ps.msg_waiting_worker")
-        kiri, kanan = st.columns([6, 1], vertical_alignment="center")
+        kiri, kanan = st.columns([20, 1], vertical_alignment="center")
         kiri.markdown(
             f'<div class="ids-run-foot"><span class="ids-run-phase">'
             f'{_html.escape(_ringkas)}</span>'
@@ -3264,8 +3217,8 @@ def _poll_experiment(experiment_id: str):
             f'<div class="ids-run-track"><div class="ids-run-fill" '
             f'style="width:{max(0, min(100, _pct))}%"></div></div>',
             unsafe_allow_html=True)
-        if kanan.button(t("ps.btn_cancel_short"), key=f"cancel_poll_{experiment_id}",
-                        use_container_width=True):
+        if kanan.button(":material/close:", key=f"cancel_poll_{experiment_id}",
+                        type="tertiary", help=t("ps.btn_cancel_short")):
             r = cancel_experiment(experiment_id)
             if r["success"]:
                 st.session_state.pop("polling_experiment_id", None)

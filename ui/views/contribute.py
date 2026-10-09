@@ -41,7 +41,7 @@ from ui.i18n import t
 # pipeline terunggah. Nama fungsinya di-alias ke nama lama supaya tidak
 # ada satu pun titik panggil yang berubah — yang bergeser hanya SUMBER-nya.
 from orchestrator.research_registry import (
-    short_label_for as get_research_short_label,
+    title_for as get_research_title,
 )
 from config.settings import DATASETS_DIR, STORAGE_DIR
 from database.models import (
@@ -4439,7 +4439,7 @@ def _compat_rows(diag: dict) -> list[dict]:
         verdict = _verdict(result)
         baris.append({
             "dataset_type": dtype,
-            "research": get_research_short_label(dtype),
+            "research": get_research_title(dtype),
             "verdict": verdict,
             "verdict_text": _VERDICT_LABEL[verdict],
             "algo_count": len(_algorithms_for(dtype)),

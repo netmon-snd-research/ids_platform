@@ -416,18 +416,14 @@ CATALOG: dict[str, dict[str, str]] = {
               "algoritma yang dipilih di sini.",
         "en": "The preprocessing and hyperparameters shown follow the "
               "algorithm selected here."},
-    "re.help_find_dataset": {"id": "Cari dataset yang cocok untuk pipeline ini.",
-                             "en": "Find a dataset that fits this pipeline."},
-    "re.help_full_detail": {"id": "Keterangan lengkap & tahapan pipeline.",
-                            "en": "Full description and pipeline stages."},
 
     # ── Keadaan kosong & pesan ───────────────────────────────────────────
     "re.empty_no_compatible": {
         "id": "Tidak ada pipeline yang kompatibel untuk dataset ini.",
         "en": "No pipeline is compatible with this dataset."},
     "re.empty_no_dataset_for_pipeline": {
-        "id": "Belum ada dataset di server yang cocok untuk research pipeline ini.",
-        "en": "No dataset on the server fits this research pipeline yet."},
+        "id": "Belum ada dataset yang cocok. Syarat utamanya:",
+        "en": "No matching dataset yet. Main requirements:"},
     "re.msg_dataset_valid": {"id": "Dataset lolos validasi skema.",
                              "en": "Dataset is valid!"},
     "re.msg_dataset_invalid": {
@@ -496,9 +492,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.live_btn_mark_failed": {"id": "Tandai gagal & tutup",
                                 "en": "Mark failed & close"},
     "re.live_btn_close": {"id": "Tutup", "en": "Close"},
-    "re.msg_log_later": {
-        "id": "Log proses lengkap akan muncul di hasil setelah selesai.",
-        "en": "The full process log will appear in the results once finished."},
     "re.msg_preview_unavailable": {"id": "Preview tidak tersedia untuk berkas ini.",
                                    "en": "No preview available for this file."},
     "re.msg_no_stages": {"id": "Tahapan pipeline ini tidak terdaftar.",
@@ -1395,11 +1388,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "rmc.adjustable_params": {
         "id": "**Parameter yang dapat disesuaikan**",
         "en": "**Parameters you can adjust**"},
-    "rmc.reset_help": {
-        "id": "Nilai bawaan pipeline menjadi titik awal; tombol ini "
-              "mengembalikan seluruh isian ke nilai itu.",
-        "en": "The pipeline's default values are the starting point; this "
-              "button returns every field to them."},
     "rmc.differs_from_default": {
         "id": "Berbeda dari bawaan:",
         "en": "Differs from the default:"},
@@ -1772,11 +1760,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "`{pipeline}` is not compatible with the selected dataset, so "
               "the catalog choice was not applied. Pick a matching dataset, or "
               "choose another pipeline below."},
-    "re.msg_n_datasets_match": {
-        "id": "{count} dataset di server cocok untuk research pipeline ini. "
-              "Pilih satu untuk melanjutkan.",
-        "en": "{count} datasets on the server fit this research pipeline. "
-              "Choose one to continue."},
     "re.empty_no_dataset_files": {
         "id": "Belum ada berkas dataset di `storage/datasets/`. Tambahkan "
               "berkas CSV (HIKARI2021) atau NDJSON (EVE Suricata) untuk "
@@ -3955,10 +3938,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.cat_origin_builtin": {"id": "bawaan", "en": "built-in"},
     "re.cat_origin_uploaded": {"id": "kontribusi", "en": "contributed"},
     "re.cat_value_unspecified": {"id": "tidak disebutkan", "en": "not stated"},
-    "re.cat_active_filters": {"id": "Aktif: {filters}", "en": "Active: {filters}"},
-    "re.cat_clear_filters": {"id": "Bersihkan", "en": "Clear"},
-    "re.cat_shown": {"id": "Menampilkan {shown} dari {total} research pipeline",
-                     "en": "Showing {shown} of {total} research pipelines"},
+    "re.cat_clear_filters": {"id": "Bersihkan penyaring", "en": "Clear filters"},
     "re.cat_empty_filtered": {"id": "Tidak ada yang cocok dengan penyaring yang sedang aktif. Bersihkan salah satunya untuk melihat lebih banyak.",
                               "en": "Nothing matches the filters currently active. Clear one of them to see more."},
     "re.cat_contributed_group": {"id": "Pipeline kontribusi · {dataset}",

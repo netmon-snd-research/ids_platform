@@ -741,22 +741,6 @@ def apply_filters(catalog, selected: dict):
     return groups
 
 
-def active_filter_text(selected: dict) -> str:
-    """Kalimat "Aktif: …" — penyaring yang menyembunyikan baris harus TERBACA.
-
-    Penyaringan bertingkat aman hanya bila apa pun yang sedang menyaring tetap
-    tercetak meski kategorinya sedang tidak dibuka.
-    """
-    labels = {key: t(label_key) for key, label_key, _ in CATEGORIES}
-    parts = []
-    for key, _label_key, _reader in CATEGORIES:
-        chosen = sorted((selected or {}).get(key) or ())
-        if chosen:
-            parts.append(f"{labels[key]} = "
-                         + ", ".join(value_label(v) for v in chosen))
-    return " · ".join(parts)
-
-
 # ── Isi MODAL: pasangan label–nilai + bagian yang dilipat ─────────────────
 
 # Baris label–nilai tingkat RESEARCH, dengan ikon kecil sebagai penanda label.
@@ -1274,7 +1258,7 @@ def _render_search_and_filters(catalog):
     baris tanpa terbaca adalah cara tercepat membuat sebuah daftar terasa rusak.
     """
     categories = catalog_categories(catalog)
-    cols = st.columns([3, 2])
+    cols = st.columns([3, 2, 0.3], vertical_alignment="bottom")
     query = cols[0].text_input(t("re.cat_search"), key=_QUERY_KEY,
                                placeholder=t("re.cat_search_ph"))
 
@@ -1306,25 +1290,20 @@ def _render_search_and_filters(catalog):
         st.session_state[_SELECTED_KEY] = {k: v for k, v in selected.items() if v}
         selected = _selected_filters()
 
+    # Ikon Bersihkan di ujung baris pencarian, bukan tombol berlabel di baris
+    # tersendiri. Digambar SESUDAH pil diproses (kolomnya boleh diisi
+    # belakangan), supaya keadaan aktifnya mengikuti pilihan pada run ini,
+    # bukan run sebelumnya. Pil sendiri sudah memperlihatkan penyaring aktif.
+    if cols[2].button(":material/filter_alt_off:", key="_cat_clear",
+                      type="tertiary", disabled=not (query or selected),
+                      help=t("re.cat_clear_filters")):
+        for key in list(st.session_state):
+            if str(key).startswith("_cat_"):
+                del st.session_state[key]
+        st.rerun()
+
     visible = apply_filters(filter_catalog(catalog, query), selected)
 
-    # SATU baris kecil: berapa yang tampil, penyaring apa yang aktif (juga
-    # dari kategori yang sedang tidak dibuka), dan Bersihkan. Penyaring tidak
-    # boleh memendekkan daftar tanpa disadari, tetapi menyatakannya tidak
-    # perlu dua baris dan sebuah tombol selebar kolom.
-    if query or selected:
-        teks = t("re.cat_shown", shown=len(visible), total=len(catalog))
-        active = active_filter_text(selected)
-        if active:
-            teks += " · " + t("re.cat_active_filters", filters=active)
-        line, clear = st.columns([6, 1], vertical_alignment="center")
-        line.caption(teks)
-        if selected and clear.button(t("re.cat_clear_filters"), key="_cat_clear",
-                                     type="tertiary", use_container_width=True):
-            for key in list(st.session_state):
-                if str(key).startswith("_cat_"):
-                    del st.session_state[key]
-            st.rerun()
     if not visible and (query or selected):
         from ui.components.sections import prose
 
@@ -1374,15 +1353,13 @@ def render_catalog(catalog=None, *, on_detail=None,
             cols = st.columns([2, 2, 3])
             if cols[0].button(t("re.btn_setup"), type="primary",
                               key=f"cat_run_{group['dataset_type']}",
-                              use_container_width=True,
-                              help=t("re.help_find_dataset")):
+                              use_container_width=True):
                 requested = group["dataset_type"]
                 if on_run is not None:
                     on_run(requested)
             # Aksi SEKUNDER — sengaja lebih tenang daripada aksi utama.
             if cols[1].button(t("re.btn_detail"), key=f"cat_detail_{group['dataset_type']}",
-                              type="tertiary", use_container_width=True,
-                              help=t("re.help_full_detail")):
+                              type="tertiary", use_container_width=True):
                 requested = group["dataset_type"]
                 if on_detail is not None:
                     on_detail(requested)

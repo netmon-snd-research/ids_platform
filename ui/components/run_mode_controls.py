@@ -172,11 +172,12 @@ def render_param_form(pipeline_id: str) -> dict:
                 render_locked_table(rows)
         return {}
 
-    head = st.columns([3, 1])
+    # Ikon putar-balik di ujung judul, bukan tombol berlabel yang terpotong
+    # menjadi "Kembalikan ke ba…". Nama tindakannya ada di tooltip.
+    head = st.columns([20, 1], vertical_alignment="center")
     head[0].markdown(t("rmc.adjustable_params"))
-    if head[1].button(t("re.btn_reset_defaults"), key=f"_pov_reset_{pipeline_id}",
-                      use_container_width=True,
-                      help=t("rmc.reset_help")):
+    if head[1].button(":material/restart_alt:", key=f"_pov_reset_{pipeline_id}",
+                      type="tertiary", help=t("re.btn_reset_defaults")):
         reset_overrides(pipeline_id)
         st.rerun()
 

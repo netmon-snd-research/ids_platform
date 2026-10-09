@@ -741,7 +741,7 @@ def render_dataset_instructions() -> None:
         all_dataset_types as supported_datasets,
     )
     from orchestrator.research_registry import (
-        short_label_for as get_research_short_label,
+        title_for as get_research_title,
     )
     from ui.i18n import t
 
@@ -761,7 +761,7 @@ def render_dataset_instructions() -> None:
     # memuat keterangan lengkap untuk research yang tidak sedang dibaca
     # siapa pun.
     types = list(supported_datasets())
-    labels = {dt: get_research_short_label(dt) for dt in types}
+    labels = {dt: get_research_title(dt) for dt in types}
     dtype = st.selectbox(t("ins.lbl_research_pipeline"), types,
                          format_func=lambda key: labels.get(key, key),
                          key="ins_dataset_research")
