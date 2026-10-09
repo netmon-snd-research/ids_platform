@@ -186,8 +186,8 @@ def create_and_run_experiment(
     ``device_id`` (opsional) adalah pengenal acak browser yang memulainya.
     Keduanya TIDAK diteruskan ke worker maupun ke pipeline — jalur komputasi
     tidak mengetahuinya. Satu-satunya pemakaiannya di tampilan: eksperimen
-    hanya terlihat oleh device dan akun pemiliknya, serta Research Admin
-    (``ui/components/dashboard.visible_runs``).
+    hanya terlihat oleh akun pemiliknya, atau bila dijalankan tanpa masuk,
+    oleh device pemiliknya (``ui/components/dashboard.visible_runs``).
 
     If USE_ASYNC is True:
       - Creates DB record (QUEUED)

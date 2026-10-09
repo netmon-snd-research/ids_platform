@@ -29,30 +29,31 @@ def _epoch(iso) -> float:
 
 
 def visible_runs(experiments, *, device_id: str | None = None,
-                 username: str | None = None, sees_all: bool = False) -> list:
+                 username: str | None = None, sees_legacy: bool = False) -> list:
     """Saring eksperimen yang boleh dilihat penonton ini. Pure.
 
     Berlaku untuk SEMUA eksperimen, yang masih berjalan maupun yang sudah
-    selesai: riwayat seseorang adalah run miliknya sendiri. Sebuah eksperimen
-    tampil bila penontonnya:
+    selesai. Pemiliknya ditentukan satu kali, menurut cara run itu dimulai:
 
-    * memulainya dari device (browser) yang sama — ``device_id`` cocok;
-    * masuk dengan akun yang memulainya — ``username`` cocok dengan ``owner``,
-      jadi riwayatnya ikut ke browser lain begitu ia masuk;
-    * Research Admin (``sees_all``), yang perlu melihat semua run untuk
-      membatalkan yang macet dan membaca seluruh riwayat.
-
-    Run lama tanpa ``device_id`` dan tanpa ``owner`` karena itu hanya terlihat
-    oleh Research Admin.
+    * dimulai sambil MASUK (``owner`` terisi): milik akun itu saja, di browser
+      mana pun. Device yang sama tidak ikut melihatnya, jadi akun lain yang
+      masuk di browser yang sama, termasuk Research Admin, tidak melihatnya;
+    * dimulai TANPA masuk (``owner`` kosong): milik browser yang memulainya,
+      dikenali dari ``device_id``;
+    * run lama yang tidak punya keduanya hanya terlihat bila ``sees_legacy``
+      (Research Admin). Tanpa itu run-run tersebut tidak terlihat oleh siapa
+      pun.
     """
-    rows = list(experiments or [])
-    if sees_all:
-        return rows
     out = []
-    for e in rows:
-        if device_id and e.get("device_id") == device_id:
-            out.append(e)
-        elif username and e.get("owner") == username:
+    for e in experiments or []:
+        owner = e.get("owner")
+        if owner:
+            if username and owner == username:
+                out.append(e)
+        elif e.get("device_id"):
+            if device_id and e["device_id"] == device_id:
+                out.append(e)
+        elif sees_legacy:
             out.append(e)
     return out
 

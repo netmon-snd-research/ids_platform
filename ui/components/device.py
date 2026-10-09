@@ -5,8 +5,8 @@ Kenapa perlu: pengunjung tanpa akun semuanya tercatat ber-``owner`` NULL, jadi
 platform tidak dapat membedakan satu pengunjung dari yang lain. Akibatnya
 setiap orang yang membuka aplikasi melihat pipeline apa yang sedang dijalankan
 orang lain. Eksperimen, yang berjalan maupun yang sudah selesai, kini hanya
-tampil di device yang memulainya dan bagi akun pemiliknya (lihat
-:func:`ui.components.dashboard.visible_runs`).
+tampil bagi akun yang memulainya, atau bila dimulai tanpa masuk, di device
+yang memulainya (lihat :func:`ui.components.dashboard.visible_runs`).
 
 Pengenalnya angka acak 128-bit di cookie ``ids_device``:
 
@@ -90,7 +90,7 @@ def viewer_identity() -> dict:
 
 
 def visible_to_viewer(experiments) -> list:
-    """:func:`visible_runs` untuk penonton sesi ini (device + akun + peran)."""
+    """:func:`visible_runs` untuk penonton sesi ini (akun, device, peran)."""
     from orchestrator.auth_service import is_research_admin
     from ui.components.dashboard import visible_runs
     from ui.views.login import current_user
@@ -100,5 +100,5 @@ def visible_to_viewer(experiments) -> list:
         experiments,
         device_id=device_id(),
         username=(user or {}).get("username"),
-        sees_all=is_research_admin(user),
+        sees_legacy=is_research_admin(user),
     )
