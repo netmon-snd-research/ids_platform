@@ -35,8 +35,6 @@ CATALOG: dict[str, dict[str, str]] = {
     # ── Jejak lokasi ─────────────────────────────────────────────────────
     # Akar jejak lokasi. Kata yang sama di kedua bahasa — dan sengaja tetap
     # "Menu" seperti sebelumnya: Tahap 1 menerjemahkan, bukan mengganti kata.
-    "crumb.root": {"id": "Menu", "en": "Menu"},
-    "crumb.separator": {"id": "›", "en": "›"},
 
     # ── Blok sidebar ─────────────────────────────────────────────────────
     "sidebar.progress_title": {"id": "Sedang berjalan", "en": "Running now"},

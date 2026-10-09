@@ -28,7 +28,6 @@ from __future__ import annotations
 from html import escape
 
 import streamlit as st
-from ui.i18n import t
 
 # Sisipan kiri seluruh isi sidebar. Item navigasi mencapainya lewat
 # border-left 3px + padding; baris teks lewat padding-left.
@@ -46,37 +45,48 @@ FONT_MAIN = "0.875rem"
 FONT_SMALL = "0.78rem"
 
 
-# ── Jejak lokasi ──────────────────────────────────────────────────────────
+# ── Merek di puncak sidebar ───────────────────────────────────────────────
 
-#: Pengenal halaman → kunci labelnya. Jejak lokasi menerima PENGENAL (itu yang
-#: dipakai routing) lalu menampilkan labelnya pada bahasa aktif.
-PAGE_LABEL_KEYS = {
-    "Progress & Status": "nav.progress",
-    "Run Experiment": "nav.run_experiment",
-    "Add Pipeline & Dataset": "nav.contribute",
-}
+#: Nama aplikasi di puncak sidebar dan di judul tab browser (ui/app.py).
+APP_NAME = "ReproIDS"
 
 
-def page_label(page: str) -> str:
-    """Label halaman pada bahasa aktif; pengenal tak dikenal dipakai apa adanya."""
-    key = PAGE_LABEL_KEYS.get((page or "").strip())
-    return t(key) if key else (page or "").strip()
+@st.cache_resource(show_spinner=False)
+def _logo_data_uri() -> str:
+    """Logo awan (ui/assets/cloud.png, sama dengan favicon) sebagai data URI.
 
-
-def breadcrumb_text(page: str, root: str | None = None) -> str:
-    """"Beranda › Jalankan Eksperimen". Murni — dipakai juga oleh test.
-
-    ``page`` adalah PENGENAL halaman, bukan teks tampilan; labelnya dicari di
-    sini supaya pemanggil tidak perlu tahu soal bahasa.
+    Disisipkan langsung ke HTML, jadi logo tampil bersama teksnya tanpa
+    menunggu satu permintaan gambar lagi di jaringan yang lambat.
     """
-    root = t("crumb.root") if root is None else root
-    label = page_label(page)
-    return f"{root} {t('crumb.separator')} {label}" if label else root
+    import base64
+    from pathlib import Path
+
+    berkas = Path(__file__).resolve().parent.parent / "assets" / "cloud.png"
+    try:
+        isi = base64.b64encode(berkas.read_bytes()).decode("ascii")
+    except OSError:                         # pragma: no cover - defensif
+        return ""
+    return f"data:image/png;base64,{isi}"
 
 
-def render_breadcrumb(page: str, root: str | None = None) -> None:
-    """Baris jejak lokasi di paling atas sidebar. Kecil, redup, tidak tebal."""
-    render_line(breadcrumb_text(page, root), muted=True, small=True)
+def brand_html() -> str:
+    """Logo + nama aplikasi untuk puncak sidebar."""
+    uri = _logo_data_uri()
+    logo = (f'<img src="{uri}" width="24" height="24" alt="" '
+            f'style="flex:0 0 auto;">' if uri else "")
+    return (f'<div style="display:flex;align-items:center;gap:.5rem;'
+            f'padding:2px 0 2px {INSET_PX}px;">{logo}'
+            f'<span style="font-size:1.05rem;font-weight:700;'
+            f'letter-spacing:.01em;">{escape(APP_NAME)}</span></div>')
+
+
+def render_brand() -> None:
+    """Logo awan + "ReproIDS" di paling atas sidebar.
+
+    Menggantikan jejak lokasi "Menu › …": menu tepat di bawahnya sudah
+    menandai halaman aktif, jadi jejak itu mengulang hal yang sama.
+    """
+    st.markdown(brand_html(), unsafe_allow_html=True)
 
 
 # ── Baris teks dengan perataan kiri yang sama ─────────────────────────────

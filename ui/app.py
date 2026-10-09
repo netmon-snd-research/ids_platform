@@ -103,7 +103,9 @@ _startup_cleanup()
 # jadi hilang bila jaringan pengguna tidak menjangkaunya, dan ikon Material
 # berwarna hitam sehingga tak terlihat di bilah tab gelap. Birunya terbaca di
 # bilah tab gelap maupun terang.
-st.set_page_config(page_title="ReproIDS",
+from ui.components.sidebar_chrome import APP_NAME  # noqa: E402
+
+st.set_page_config(page_title=APP_NAME,
                    page_icon=str(Path(__file__).resolve().parent / "assets" / "cloud.png"),
                    layout="wide")
 
@@ -156,7 +158,7 @@ from ui.views.login import (
 )
 from ui.components import theme
 from ui.components.sidebar_progress import render_sidebar_progress
-from ui.components.sidebar_chrome import menu_styles, render_breadcrumb
+from ui.components.sidebar_chrome import menu_styles, render_brand
 from ui.components.page_flags import drop_stale_page_flags
 from ui.components.device import render_device_cookie
 from ui.i18n import t
@@ -272,22 +274,15 @@ def _select_page() -> str:
     return _PAGES[labels.index(chosen)] if chosen in labels else _DEFAULT_PAGE
 
 
-# Blok 1 dari sidebar: jejak lokasi lalu menu tiga halaman.
-#
-# Tempat jejak lokasi dipesan LEBIH DULU supaya ia tampil di atas menu,
-# sementara isinya baru ditulis setelah `option_menu` mengembalikan halaman yang
-# benar-benar terpilih pada run ini. Membacanya dari session_state sebelum menu
-# dirender akan menampilkan halaman run SEBELUMNYA setiap kali pengguna
-# berpindah.
-_breadcrumb_slot = st.sidebar.empty()
+# Blok 1 dari sidebar: logo + nama aplikasi, lalu menu tiga halaman.
+with st.sidebar:
+    render_brand()
 
 page = _select_page()
 # Ingat halaman aktif supaya rerun apa pun (login/logout, aksi di sidebar)
 # tidak memindahkan pengguna dari konteks yang sedang ia kerjakan.
 st.session_state[_CURRENT_PAGE_KEY] = page
 
-with _breadcrumb_slot:
-    render_breadcrumb(page)
 
 # Flag modal yang hanya sah di halamannya dibuang di sini, SEBELUM halaman
 # dirender. Sebuah view tidak dapat mendeteksi kepergiannya sendiri (render()-nya

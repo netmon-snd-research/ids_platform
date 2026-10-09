@@ -1878,6 +1878,16 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
 @media (prefers-reduced-motion: reduce) {{
     [data-testid="stSkeleton"] {{ animation: none; }}
 }}
+/* Di SIDEBAR kerangkanya tidak terlihat sama sekali: menu yang sedang dimuat
+   cukup berupa ruang kosong, tanpa kotak, tulisan, atau denyut. Tingginya
+   disamakan dengan wadah menu tiga halaman yang sudah termuat (±177 px), supaya
+   kartu eksperimen di bawahnya tidak meloncat turun begitu menunya muncul. */
+[data-testid="stSidebar"] [data-testid="stSkeleton"] {{
+    background: transparent;
+    animation: none;
+    height: 177px;
+}}
+[data-testid="stSidebar"] [data-testid="stSkeleton"]::after {{ content: none; }}
 </style>
 """
 
