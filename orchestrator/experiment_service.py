@@ -185,8 +185,8 @@ def create_and_run_experiment(
     pengguna yang sedang masuk, atau None bila dijalankan tanpa login.
     ``device_id`` (opsional) adalah pengenal acak browser yang memulainya.
     Keduanya TIDAK diteruskan ke worker maupun ke pipeline — jalur komputasi
-    tidak mengetahuinya. Satu-satunya pemakaiannya di tampilan: run yang masih
-    mengantre/berjalan hanya terlihat oleh device dan akun pemiliknya
+    tidak mengetahuinya. Satu-satunya pemakaiannya di tampilan: eksperimen
+    hanya terlihat oleh device dan akun pemiliknya, serta Research Admin
     (``ui/components/dashboard.visible_runs``).
 
     If USE_ASYNC is True:

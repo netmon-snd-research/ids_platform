@@ -1874,11 +1874,9 @@ CATALOG: dict[str, dict[str, str]] = {
     "ap.visibility_private": {"id": "Hanya saya", "en": "Only me"},
     "ap.help_visibility": {
         "id": "Publik: terlihat dan dapat dipakai semua orang. Hanya saya: "
-              "terlihat oleh Anda dan Research Admin saja. Hasil eksperimennya "
-              "tetap terlihat semua orang.",
+              "terlihat oleh Anda dan Research Admin saja.",
         "en": "Public: visible to and usable by everyone. Only me: visible to "
-              "you and Research Admins only. Experiment results stay visible "
-              "to everyone."},
+              "you and Research Admins only."},
     "ap.err_same_content": {
         "id": "Dataset ini sudah pernah diunggah dengan nama **{existing}**. "
               "Isinya sama persis, jadi tidak perlu diunggah lagi. Pilih "

@@ -32,26 +32,25 @@ def visible_runs(experiments, *, device_id: str | None = None,
                  username: str | None = None, sees_all: bool = False) -> list:
     """Saring eksperimen yang boleh dilihat penonton ini. Pure.
 
-    Run yang SUDAH selesai (FINISHED, FAILED, …) selalu tampil: hasilnya adalah
-    catatan penelitian bersama. Run yang masih mengantre atau berjalan hanya
+    Berlaku untuk SEMUA eksperimen, yang masih berjalan maupun yang sudah
+    selesai: riwayat seseorang adalah run miliknya sendiri. Sebuah eksperimen
     tampil bila penontonnya:
 
     * memulainya dari device (browser) yang sama — ``device_id`` cocok;
-    * masuk dengan akun yang memulainya — ``username`` cocok dengan ``owner``;
+    * masuk dengan akun yang memulainya — ``username`` cocok dengan ``owner``,
+      jadi riwayatnya ikut ke browser lain begitu ia masuk;
     * Research Admin (``sees_all``), yang perlu melihat semua run untuk
-      membatalkan yang macet.
+      membatalkan yang macet dan membaca seluruh riwayat.
 
     Run lama tanpa ``device_id`` dan tanpa ``owner`` karena itu hanya terlihat
-    oleh Research Admin selama masih tercatat berjalan.
+    oleh Research Admin.
     """
     rows = list(experiments or [])
     if sees_all:
         return rows
     out = []
     for e in rows:
-        if e.get("status") not in _RUNNING_ORDER:
-            out.append(e)
-        elif device_id and e.get("device_id") == device_id:
+        if device_id and e.get("device_id") == device_id:
             out.append(e)
         elif username and e.get("owner") == username:
             out.append(e)

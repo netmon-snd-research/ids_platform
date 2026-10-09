@@ -4,8 +4,9 @@ Identitas DEVICE (browser) penonton, dan penyaring tampilan yang memakainya.
 Kenapa perlu: pengunjung tanpa akun semuanya tercatat ber-``owner`` NULL, jadi
 platform tidak dapat membedakan satu pengunjung dari yang lain. Akibatnya
 setiap orang yang membuka aplikasi melihat pipeline apa yang sedang dijalankan
-orang lain. Run yang masih berjalan kini hanya tampil di device yang
-memulainya (lihat :func:`ui.components.dashboard.visible_runs`).
+orang lain. Eksperimen, yang berjalan maupun yang sudah selesai, kini hanya
+tampil di device yang memulainya dan bagi akun pemiliknya (lihat
+:func:`ui.components.dashboard.visible_runs`).
 
 Pengenalnya angka acak 128-bit di cookie ``ids_device``:
 
@@ -19,8 +20,8 @@ Pengenalnya angka acak 128-bit di cookie ``ids_device``:
 Ini BUKAN autentikasi. Cookie ini tidak memberi hak apa pun; ia hanya
 menentukan run berjalan mana yang ditampilkan. Menebaknya berarti menebak 128
 bit acak. Browser lain, mode penyamaran, atau cookie yang dihapus berarti
-device baru — run yang masih berjalan dari device lama tidak lagi tampil,
-tetapi hasilnya tetap masuk riwayat bersama begitu selesai.
+device baru: run dari device lama tidak lagi tampil, kecuali dijalankan
+dengan akun yang sedang masuk.
 """
 from __future__ import annotations
 

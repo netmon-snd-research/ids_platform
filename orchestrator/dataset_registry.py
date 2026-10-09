@@ -14,7 +14,7 @@ Aturan:
   pun yang memegang server tetap dapat membaca berkasnya.
 * Menghapus hanya boleh oleh pemiliknya atau Research Admin; dataset tanpa
   pemilik hanya oleh Research Admin. Berkasnya benar-benar dihapus. Catatan
-  eksperimen yang memakainya TETAP ada dan tetap terbaca semua orang, tetapi
+  eksperimen yang memakainya TETAP ada dan tetap terbaca pemiliknya, tetapi
   tidak dapat dijalankan ulang. Dataset yang sedang dipakai run yang masih
   mengantre atau berjalan tidak dapat dihapus.
 
