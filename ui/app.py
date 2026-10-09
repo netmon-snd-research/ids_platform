@@ -98,7 +98,14 @@ def _startup_cleanup():
 
 _startup_cleanup()
 
-st.set_page_config(page_title="IDS Research Pipeline System", page_icon="", layout="wide")
+# Ikon tab: awan, bukan mahkota bawaan Streamlit. Berkas PNG milik repo,
+# bukan ikon Material atau emoji: keduanya diambil dari server font Google,
+# jadi hilang bila jaringan pengguna tidak menjangkaunya, dan ikon Material
+# berwarna hitam sehingga tak terlihat di bilah tab gelap. Birunya terbaca di
+# bilah tab gelap maupun terang.
+st.set_page_config(page_title="ReproIDS",
+                   page_icon=str(Path(__file__).resolve().parent / "assets" / "cloud.png"),
+                   layout="wide")
 
 # ── Small-screen CSS (media query gated; desktop untouched) ──────────────
 # All rules are scoped to viewport widths <= 768px (tablet portrait & phone).

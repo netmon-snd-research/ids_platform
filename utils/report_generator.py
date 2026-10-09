@@ -127,7 +127,7 @@ def generate_report(
         leftMargin=2.2*cm, rightMargin=2.2*cm,
         topMargin=2.0*cm, bottomMargin=2.0*cm,
         title=f"Laporan Eksperimen {pipeline_id}",
-        author="IDS Research Pipeline Execution System",
+        author="ReproIDS",
     )
     styles = _build_styles()
     story: list = []
