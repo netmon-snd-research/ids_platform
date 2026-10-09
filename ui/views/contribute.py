@@ -4048,11 +4048,19 @@ def _render_dataset_flow() -> None:
         _request_dataset_info()
 
     st.divider()
-    tab_upload, tab_server = st.tabs(["Unggah berkas", "Daftarkan dari server"])
-    with tab_upload:
+    # "Daftarkan dari server" HANYA untuk Research Admin: tab itu membuka
+    # seluruh isi folder dataset server, dan menaruh berkas di sana memang
+    # pekerjaan pengelola server. Peran lain langsung mendapat kotak unggah,
+    # tanpa baris tab yang isinya cuma satu.
+    if can_approve(current_user()):
+        tab_upload, tab_server = st.tabs(["Unggah berkas",
+                                          "Daftarkan dari server"])
+        with tab_upload:
+            _render_dataset_upload_tab()
+        with tab_server:
+            _render_dataset_server_tab()
+    else:
         _render_dataset_upload_tab()
-    with tab_server:
-        _render_dataset_server_tab()
 
     _maybe_render_dataset_info()
 
@@ -4086,9 +4094,8 @@ def _render_dataset_upload_tab() -> None:
     size = upload_size(uploaded)
     if size > MAX_DATASET_UPLOAD_BYTES:
         st.error(f"Berkas terlalu besar ({format_size(size)}, batas "
-                 f"{limit_gb:.0f} GB). Salin berkas ke `storage/datasets/` di "
-                 f"server, lalu pakai tab **Daftarkan dari server**, tanpa "
-                 f"batas ukuran dan tanpa penyalinan.")
+                 f"{limit_gb:.0f} GB). Research Admin dapat menyalinnya "
+                 f"langsung ke server.")
         return
 
     # Dataset dikenali dari ISINYA. Duplikat ditolak sebelum diagnosa, supaya
@@ -4173,6 +4180,10 @@ def _render_dataset_server_tab() -> None:
     """Daftarkan berkas yang SUDAH ada di storage/datasets/ — tanpa batas
     ukuran dan tanpa penyalinan. Jalur untuk dataset besar (mis. EVE 5,9 GB)
     yang tidak masuk akal lewat peramban."""
+    # Penjaga kedua: tab ini memang hanya digambar untuk Research Admin, tetapi
+    # fungsi yang membuka isi folder server tidak boleh bergantung pada itu.
+    if not can_approve(current_user()):
+        return
     # Pembacaan folder memakai mekanisme yang SAMA dengan halaman Run Experiment.
     from ui.views.run_experiment import _all_dataset_options, _diagnose_selected
 

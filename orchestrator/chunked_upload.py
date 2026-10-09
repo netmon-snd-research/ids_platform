@@ -181,8 +181,7 @@ def begin(token: str, filename: str, size: int) -> dict:
     if size > MAX_DATASET_UPLOAD_BYTES:
         raise UploadError(
             f"Berkas melebihi batas unggah {MAX_DATASET_UPLOAD_BYTES // 1024 ** 3} GB. "
-            "Salin ke storage/datasets/ di server, lalu pakai tab "
-            "Daftarkan dari server.", 413)
+            "Research Admin dapat menyalinnya langsung ke server.", 413)
     # Nama yang sudah dipakai TIDAK ditolak di sini. Dataset dikenali dari
     # isinya, dan isi baru diketahui setelah berkas lengkap: duplikat ditolak
     # di halaman, dan isi berbeda bernama sama disimpan dengan nama lain
