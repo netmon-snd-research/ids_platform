@@ -318,9 +318,22 @@ def _open_running(experiment_id) -> None:
     from ui.components import page_flags
     from ui.views import run_experiment as rx
 
+    # Dataset dan pipeline run itu ikut DIPILIH, lewat titipan yang sama
+    # dengan tombol Pilih di tabel dataset dan pilihan dari katalog. Tanpa
+    # itu halaman mendarat di tabel dataset, dan pemantauan hanya muncul
+    # lewat jalur cadangan di bawahnya.
+    pipeline_id = None
     if experiment_id:
         st.session_state["polling_experiment_id"] = experiment_id
-    rx.go_to_execute()
+        try:
+            from orchestrator.experiment_service import get_experiment_status
+            run = get_experiment_status(experiment_id) or {}
+        except Exception:                   # pragma: no cover - defensif
+            run = {}
+        if run.get("dataset_path"):
+            st.session_state[rx.PENDING_DATASET_KEY] = run["dataset_path"]
+        pipeline_id = run.get("pipeline_id")
+    rx.go_to_execute(pipeline_id)
     page_flags.request_page(RUN_PAGE)
 
 

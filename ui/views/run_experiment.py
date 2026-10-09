@@ -1451,8 +1451,26 @@ def _apply_pending_dataset(paths) -> None:
     tidak pernah ia lakukan. Sekali pakai — ia dibuang saat diambil.
     """
     pending = st.session_state.pop(PENDING_DATASET_KEY, None)
-    if pending is not None and pending in (paths or []):
-        st.session_state[DATASET_SELECT_KEY] = pending
+    if pending is None:
+        return
+    # Dicocokkan sebagai PATH, bukan string persis: path yang dicatat sebuah
+    # run (dibuka dari kartu sidebar) dapat ditulis dengan pemisah berbeda,
+    # atau berasal dari lingkungan lain. Cadangannya nama berkas, karena
+    # dataset platform tinggal rata di satu folder.
+    def _norm(x):
+        try:
+            return str(Path(x).resolve())
+        except OSError:                     # pragma: no cover - defensif
+            return str(x)
+    target = _norm(pending)
+    for p in paths or []:
+        if _norm(p) == target:
+            st.session_state[DATASET_SELECT_KEY] = p
+            return
+    nama = Path(str(pending)).name
+    sama = [p for p in paths or [] if Path(p).name == nama]
+    if len(sama) == 1:
+        st.session_state[DATASET_SELECT_KEY] = sama[0]
 
 
 def dataset_rows(options, sizes, mtimes=None, meta=None) -> list[dict]:
@@ -2163,6 +2181,25 @@ def _close_run_dialogs() -> None:
         dlg.clear_payload(key)
 
 
+def _is_polled_selection(experiment_id: str, pipeline_id, dataset_path) -> bool:
+    """Apakah pipeline & dataset terpilih adalah run yang sedang dipantau.
+
+    Ragu berarti YA: bila run-nya tidak terbaca, tampilan pemantauan yang
+    digambar, karena ia sendiri yang tahu cara menyatakan run hilang dan
+    membersihkan penandanya.
+    """
+    try:
+        data = get_experiment_status(experiment_id) or {}
+    except Exception:                       # pragma: no cover - defensif
+        return True
+    if not data:
+        return True
+    sama_pipeline = data.get("pipeline_id") == pipeline_id
+    sama_dataset = (Path(str(data.get("dataset_path") or "")).name
+                    == Path(str(dataset_path or "")).name)
+    return sama_pipeline and sama_dataset
+
+
 def is_polling() -> bool:
     """Ada eksperimen yang SEDANG BERJALAN dan dipantau sesi ini."""
     return bool(st.session_state.get("polling_experiment_id"))
@@ -2849,12 +2886,18 @@ def _render_execute():
     # Validate once per selected path — identical logic to the former "Validate
     # Dataset" button (validate_dataset_for_ui), guarded so the parse/hash runs
     # once per selection (not every rerun). A new selection re-validates and
-    # drops stale result/polling/pipeline state.
+    # drops stale result/pipeline state.
+    #
+    # `polling_experiment_id` SENGAJA dibiarkan: pemantauan hanya digambar
+    # bila dataset & algoritma terpilih adalah run yang dipantau
+    # (`_is_polled_selection`), jadi berganti dataset sudah menyembunyikannya.
+    # Membuangnya justru memutus pemantauan saat kartu sidebar membuka run
+    # beserta dataset-nya.
     if st.session_state.get("_validated_path") != dataset_path:
         with st.spinner("Memvalidasi dataset…"):
             st.session_state["validation"] = validate_dataset_for_ui(dataset_type, dataset_path)
         st.session_state["_validated_path"] = dataset_path
-        for _k in ("last_result", "polling_experiment_id", "research_select", "algorithm_select", "selected_pipeline"):
+        for _k in ("last_result", "research_select", "algorithm_select", "selected_pipeline"):
             st.session_state.pop(_k, None)
 
     v = st.session_state.get("validation") or {}
@@ -3013,11 +3056,17 @@ def _render_execute():
     # `session_state`, yang barusan ditulis di atas.
 
     # ── Execute (conditional — only after a pipeline is selected) ───────
-    # Async polling view takes over while an experiment is in flight.
-    if "polling_experiment_id" in st.session_state:
+    # Tampilan pemantauan mengambil alih HANYA bila pilihan di layar adalah
+    # run yang dipantau (algoritma dan dataset yang sama). Memilih algoritma
+    # lain mengembalikan bagian Eksekusi biasa, jadi algoritma itu dapat
+    # dijalankan juga; run yang dipantau terus berjalan, tetap terlihat di
+    # sidebar, dan progresnya muncul lagi bila algoritmanya dipilih kembali.
+    polled = st.session_state.get("polling_experiment_id")
+    if polled:
         st.session_state[_POLL_RENDERED_KEY] = True
-        _poll_experiment(st.session_state["polling_experiment_id"])
-        return
+        if _is_polled_selection(polled, selected, dataset_path):
+            _poll_experiment(polled)
+            return
 
     if selected:
         render_section(t("re.sec_execute"), help=t("re.help_execute"))
