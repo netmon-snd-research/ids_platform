@@ -855,28 +855,47 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 [class*="st-key-auth_pick_"] .stButton,
 [class*="st-key-auth_logout"] .stButton {{ margin: .1rem 0; }}
 
-/* ── Blok mode menempel di DASAR sidebar ───────────────────────────────
-   PERINGATAN VERSI: dua selektor di bawah bergantung pada struktur internal
-   Streamlit (data-testid). Diperiksa terhadap Streamlit 1.59.2 — bila versinya
-   dinaikkan, periksa ulang bahwa `stSidebarUserContent` dan `stVerticalBlock`
-   masih ada dan masih bersarang seperti ini.
+/* ── Blok akun MENEMPEL di dasar sidebar ───────────────────────────────
+   Dua bagian:
 
-   Percobaan sebelumnya GAGAL karena flex dipasang pada stSidebarUserContent
-   saja. Streamlit menaruh SEMUA elemen sidebar di dalam satu stVerticalBlock
-   di dalamnya, jadi wadah flex itu hanya punya satu anak dan pengatur jarak di
-   dalam blok tidak pernah memuai. Yang benar adalah menjadikan BLOK ITU
-   sendiri kolom fleksibel — di situlah elemen-elemen sidebar bersaudara. */
-[data-testid="stSidebarUserContent"] > [data-testid="stVerticalBlock"] {{
+   1. Kolom flex setinggi layar, dan blok akun didorong ke dasarnya dengan
+      `margin-top: auto`, untuk sidebar yang isinya pendek.
+   2. `position: sticky; bottom: 0` di dalam `stSidebarContent` (elemen yang
+      menggulung), untuk sidebar yang isinya PANJANG: daftar eksperimen
+      berjalan yang bertambah tergulung di bawahnya, blok akun tetap terlihat.
+
+   Selektornya mencari BLOK yang memuat jangkar, bukan jalur anak langsung:
+   Streamlit 1.65 menyisipkan `div` di antara stSidebarUserContent dan
+   stVerticalBlock, dan selektor `>` yang dulu (diperiksa pada 1.59) karena
+   itu berhenti cocok tanpa satu galat pun.
+
+   Latarnya `inherit` sampai ke `stSidebar`, satu-satunya elemen yang
+   berwarna. Streamlit tidak menyediakan variabel CSS untuk warna itu, dan
+   menuliskannya langsung akan salah begitu tema diganti. */
+[data-testid="stSidebarUserContent"]
+    [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] .ids-mode-anchor) {{
     display: flex;
     flex-direction: column;
     min-height: calc(100vh - 7rem);
 }}
-/* Anak mana pun yang MEMUAT jangkar didorong ke dasar. Memakai `:has()` agar
-   tidak bergantung pada testid pembungkus st.container() — apa pun bentuk
-   pembungkusnya, yang memuat jangkar itulah yang terdorong. */
-[data-testid="stSidebarUserContent"] > [data-testid="stVerticalBlock"]
-    > *:has(.ids-mode-anchor) {{
+[data-testid="stSidebarContent"],
+[data-testid="stSidebarUserContent"],
+[data-testid="stSidebarUserContent"] > div,
+[data-testid="stSidebarUserContent"]
+    [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] .ids-mode-anchor) {{
+    background-color: inherit;
+}}
+/* Diawali jalur sidebar lengkap supaya lebih kuat daripada aturan label mode
+   di bawah (`> *:has(.ids-mode-label)`), yang juga mengenai blok ini karena
+   labelnya ada di dalamnya dan dulu menimpa `margin-top: auto` menjadi .5rem. */
+[data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"]
+    > [data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) {{
     margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;                          /* di atas tombol kartu eksperimen */
+    background-color: inherit;
+    padding-bottom: 1rem;
 }}
 .ids-mode-anchor {{ display: none; }}
 
