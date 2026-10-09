@@ -1850,6 +1850,34 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
 /* Redup bawaan Streamlit pada elemen basi (rerun > 0,5 detik) SENGAJA tidak
    dimatikan: redup itulah yang membedakan sisa run sebelumnya dari isi yang
    baru. Mematikannya membuat sisa halaman lain tampil seperti isi asli. */
+
+/* ── Kerangka pemuatan komponen ────────────────────────────────────────
+   Komponen iframe (menu sidebar, tabel AgGrid) memuat JavaScript-nya sendiri,
+   dan di jaringan lambat itu butuh beberapa detik. Selama itu Streamlit
+   menggambar `stSkeleton`: kotak abu-abu datar tanpa keterangan, yang terbaca
+   seperti halaman rusak. Kotak itu kini berdenyut dan menyebut "Memuat…".
+   Teksnya dari variabel `--ids-loading`, diisi `inject()` menurut bahasa. */
+[data-testid="stSkeleton"] {{
+    position: relative;
+    animation: ids-skeleton-pulse 1.4s ease-in-out infinite;
+}}
+[data-testid="stSkeleton"]::after {{
+    content: var(--ids-loading, "…");
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: {FONT_CAPTION};
+    opacity: .65;
+}}
+@keyframes ids-skeleton-pulse {{
+    0%, 100% {{ opacity: 1; }}
+    50%      {{ opacity: .55; }}
+}}
+@media (prefers-reduced-motion: reduce) {{
+    [data-testid="stSkeleton"] {{ animation: none; }}
+}}
 </style>
 """
 
@@ -1861,7 +1889,11 @@ def inject() -> None:
     tiap kali — yang penting hanya ada SATU tempat definisinya, bukan salinan
     yang tersebar di tiap berkas view.
     """
-    st.markdown(_CSS, unsafe_allow_html=True)
+    from ui.i18n import t
+
+    teks = t("app.loading").replace("\\", "").replace('"', "")
+    st.markdown(_CSS + f'<style>:root {{ --ids-loading: "{teks}"; }}</style>',
+                unsafe_allow_html=True)
 
 
 def stylesheet() -> str:

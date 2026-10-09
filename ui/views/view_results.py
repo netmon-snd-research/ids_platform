@@ -32,7 +32,6 @@ from orchestrator import run_mode as rm
 from ui.components import experiment_table as et
 from ui.components import tables as tbl
 from ui.components.sections import prose
-from ui.components.page_flags import wait_before_refresh
 from ui.components.device import viewer_identity, visible_to_viewer
 
 # Nama halaman ini di menu ui/app.py. Dipakai mengikat pembaruan
@@ -889,15 +888,17 @@ def _dash_health(nonce: int) -> dict:
                 "can_run": False, "message": ""}
 
 
-def _render_running_section(experiments) -> tuple:
-    """Dashboard of ALL in-flight (RUNNING/QUEUED) experiments — one card each
-    with progress bar + running stage + cancel. Returns (running, auto, interval).
+#: Jeda penyegaran daftar Sedang Berjalan, dalam detik.
+_DASH_INTERVAL = 6
+_DASH_RUNNING_IDS = "_dash_running_ids"
 
-    Progress is read cross-session via get_experiment_status (task_id → Celery
-    AsyncResult); when granular data is unavailable (QUEUED, or broker down) the
-    card shows status + elapsed only — never a fabricated percentage."""
-    running = select_running(experiments)
 
+def _render_running_head() -> bool:
+    """Judul Sedang Berjalan + Auto-refresh + Perbarui. Mengembalikan auto.
+
+    Di LUAR fragmen: mengubah Auto-refresh menggambar ulang halaman, dan
+    hanya dengan begitu jeda penyegaran fragmennya dapat berubah.
+    """
     # Penanda `.ids-dash-head`: di layar sempit judul tetap satu baris penuh,
     # tetapi Auto-refresh dan Perbarui berdampingan alih-alih dua baris.
     head_box = st.container()
@@ -912,10 +913,42 @@ def _render_running_section(experiments) -> tuple:
     if head[2].button(t("ps.btn_refresh_now"), use_container_width=True, key="_dash_refresh"):
         st.session_state["_dash_nonce"] = st.session_state.get("_dash_nonce", 0) + 1
         st.rerun()
+    return bool(auto)
+
+
+def _render_running_live() -> None:
+    """Isi Sedang Berjalan. Dijalankan sebagai FRAGMEN yang menyegarkan diri.
+
+    Dahulu seluruh halaman di-`st.rerun()` setiap beberapa detik, sehingga
+    tabel riwayat ikut meredup dan digambar ulang walau tidak berubah. Kini
+    hanya bagian ini yang berjalan ulang. Daftarnya dibaca ulang di sini,
+    bukan diterima dari luar: fragmen yang berjalan sendiri tidak melihat
+    variabel dari run halaman sebelumnya.
+
+    Bila himpunan run berubah (ada yang selesai atau baru mulai), seluruh
+    halaman disegarkan SEKALI supaya riwayatnya ikut terbarui.
+    """
+    experiments = visible_to_viewer(list_all_experiments())
+    running = _render_running_section(experiments)
+    ids = sorted(e["id"] for e in running)
+    sebelumnya = st.session_state.get(_DASH_RUNNING_IDS)
+    st.session_state[_DASH_RUNNING_IDS] = ids
+    if sebelumnya is not None and sebelumnya != ids:
+        st.rerun(scope="app")
+
+
+def _render_running_section(experiments) -> list:
+    """Dashboard of ALL in-flight (RUNNING/QUEUED) experiments — one row each
+    with progress bar + running stage + cancel. Returns the running list.
+
+    Progress is read cross-session via get_experiment_status (task_id → Celery
+    AsyncResult); when granular data is unavailable (QUEUED, or broker down) the
+    row shows status + elapsed only — never a fabricated percentage."""
+    running = select_running(experiments)
 
     if not running:
         st.info(t("ps.empty_running"))
-        return running, bool(auto), 6
+        return running
 
     health = _dash_health(st.session_state.get("_dash_nonce", 0))
     async_mode = health.get("mode") == "async"
@@ -936,31 +969,44 @@ def _render_running_section(experiments) -> tuple:
         el = elapsed_seconds(e.get("started_at") or e.get("created_at"))
         cur_status = status_data.get("status", e.get("status", "-"))
 
+        # SATU baris per run: nama + dataset · waktu | fase, persen, bilah tipis
+        # | Batalkan. Dahulu kartu setinggi lima baris (judul, status, bilah
+        # tebal berlabel, fase, tombol), sehingga dua run sudah memenuhi layar.
+        fase = pv["stage_name"] or pv["stage_label"]
+        if not fase:
+            fase = (t("ps.msg_waiting_worker") if e.get("status") == "QUEUED"
+                    else cur_status)
         with st.container(border=True):
-            top = st.columns([3, 1])
-            _mulai = (e.get("started_at") or e.get("created_at") or "-")[:19]
-            top[0].markdown(
-                f"**{e.get('pipeline_id', '?')}** · {e.get('dataset_type', '?')} · "
-                f"mulai {_mulai} · elapsed {format_elapsed(el)}")
-            top[1].markdown(f"`{cur_status}`")
-            if pv["overall_percent"] is not None:
-                st.progress(min(max(pv["overall_percent"], 0), 100) / 100.0,
-                            text=f"Progres keseluruhan: {pv['overall_percent']}%")
-            if pv["stage_label"]:
-                st.markdown(f"**{pv['stage_label']}**")
-            elif e.get("status") == "QUEUED":
-                st.markdown(t("ps.msg_waiting_worker"))
-            else:
-                st.markdown(t("ps.msg_no_granular"))
-            if st.button(t("ps.btn_cancel_short"), key=f"dash_cancel_{eid}"):
+            st.markdown('<span class="ids-queue-row ids-dash-run"></span>',
+                        unsafe_allow_html=True)
+            kiri, tengah, kanan = st.columns([4, 6, 2],
+                                             vertical_alignment="center")
+            nama = escape(et.pipeline_label(e.get("pipeline_id"),
+                                              _pipeline_names()))
+            sub = escape(f"{e.get('dataset_type') or '-'} · "
+                              f"{format_elapsed(el)}")
+            kiri.markdown(f"**{nama}**<span class=\"ids-row-sub\">{sub}</span>",
+                          unsafe_allow_html=True)
+            pct = pv["overall_percent"]
+            persen = (f'<span class="ids-run-pct">{int(pct)}%</span>'
+                      if pct is not None else "")
+            bilah = (f'<div class="ids-run-track"><div class="ids-run-fill" '
+                     f'style="width:{max(0, min(100, int(pct)))}%"></div></div>'
+                     if pct is not None else "")
+            tengah.markdown(
+                f'<div class="ids-run-foot"><span class="ids-run-phase">'
+                f'{escape(str(fase))}</span>{persen}</div>{bilah}',
+                unsafe_allow_html=True)
+            if kanan.button(t("ps.btn_cancel_short"), key=f"dash_cancel_{eid}",
+                            use_container_width=True):
                 r = cancel_experiment(eid)
                 if r.get("success"):
                     st.warning(t("ps.msg_cancelled"))
                 else:
                     st.error(r.get("message") or t("ps.msg_cancel_failed"))
-                st.rerun()
+                st.rerun(scope="app")
 
-    return running, bool(auto), 6
+    return running
 
 
 @st.cache_data(show_spinner=False)
@@ -1402,8 +1448,14 @@ def render():
     # tetap tampil bagi semua.
     experiments = visible_to_viewer(list_all_experiments())
 
-    # -- Sedang Berjalan (in-flight experiments milik penonton ini) --
-    running, auto, interval = _render_running_section(experiments)
+    # -- Sedang Berjalan: kepala di luar, daftarnya fragmen yang menyegarkan
+    #    diri sendiri. Fragmen tidak meredupkan atau menggambar ulang bagian
+    #    lain halaman, termasuk tabel riwayat dan dialog yang terbuka.
+    auto = _render_running_head()
+    # Pembanding perubahan run dimulai baru pada setiap run halaman penuh:
+    # sisa dari kunjungan sebelumnya akan memicu satu penyegaran yang sia-sia.
+    st.session_state.pop(_DASH_RUNNING_IDS, None)
+    st.fragment(run_every=_DASH_INTERVAL if auto else None)(_render_running_live)()
 
     st.markdown("---")
     st.subheader(t("ps.history_title"))
@@ -1427,12 +1479,3 @@ def render():
     if experiments and dlg.is_open(_COMPARE_KEY):
         _maybe_render_comparison(all_rows, et.parameter_keys(_pipeline_params))
 
-    # -- Auto-refresh the running dashboard (adaptive; paused while a pop-up is
-    #    open so it is not disrupted). Broker is not probed on every rerun --
-    if (running and auto and not dlg.is_open(dlg.DETAIL_KEY)
-            and not dlg.is_open(_COMPARE_KEY)):
-        # Sama seperti pemantauan di halaman Run Experiment: jeda yang dapat
-        # disela dan terikat pada halaman ini, sehingga berpindah halaman tidak
-        # menahan klik pengguna dan tidak meninggalkan sisa gambar.
-        if wait_before_refresh(interval, page=PAGE_NAME):
-            st.rerun()

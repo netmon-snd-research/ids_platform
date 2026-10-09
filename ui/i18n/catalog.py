@@ -27,6 +27,7 @@ CATALOG: dict[str, dict[str, str]] = {
     # mungkin berbeda sebutan.
     "nav.section": {"id": "Navigasi", "en": "Navigation"},
     "nav.run_experiment": {"id": "Jalankan Eksperimen", "en": "Run Experiment"},
+    "app.loading": {"id": "Memuat…", "en": "Loading…"},
     "nav.progress": {"id": "Progres & Status", "en": "Progress & Status"},
     "nav.contribute": {"id": "Tambah Pipeline & Dataset",
                        "en": "Add Pipeline & Dataset"},
@@ -208,9 +209,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "ps.msg_waiting_worker": {
         "id": "Menunggu worker mengambil tugas…",
         "en": "Waiting for a worker to pick up the task…"},
-    "ps.msg_no_granular": {
-        "id": "Progres granular tidak tersedia untuk eksperimen ini.",
-        "en": "Granular progress is not available for this experiment."},
     "ps.msg_broker_down": {
         "id": "Broker (Redis) tidak tersambung: progres granular tidak "
               "tersedia; menampilkan status & elapsed saja.",
@@ -355,7 +353,6 @@ CATALOG: dict[str, dict[str, str]] = {
                               "en": "Dataset details (preview & validation)"},
     "re.dlg_about_pipeline": {"id": "Tentang Research Pipeline (hanya baca)",
                               "en": "About the Research Pipeline (read only)"},
-    "re.dlg_diag_detail": {"id": "Detail diagnostik", "en": "Diagnostic details"},
     "re.dlg_dataset_req": {"id": "Persyaratan dataset", "en": "Dataset requirements"},
 
     # ── Label widget (frasa pendek) ──────────────────────────────────────
@@ -367,6 +364,9 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.phase_files_none": {"id": "belum ada berkas yang ditempatkan di sini",
                            "en": "no file placed here yet"},
     "re.btn_change_dataset": {"id": "Ganti dataset", "en": "Change dataset"},
+    "re.help_back_running": {
+        "id": "Eksperimen tetap berjalan. Buka lagi lewat kartu di sidebar.",
+        "en": "The experiment keeps running. Reopen it from the sidebar card."},
     "re.lbl_pick_pipeline": {"id": "Pilih research pipeline",
                              "en": "Choose research pipeline"},
     "re.ph_pick_pipeline": {"id": "Pilih research pipeline…",
@@ -391,7 +391,6 @@ CATALOG: dict[str, dict[str, str]] = {
     # adalah pemilihan dataset, dan itulah yang disebut namanya sekarang.
     "re.btn_go_dataset": {"id": "Pilih dataset", "en": "Pick a dataset"},
     "re.btn_detail": {"id": "Detail", "en": "Details"},
-    "re.btn_cancel_exp": {"id": "Batalkan Eksperimen", "en": "Cancel Experiment"},
     "re.btn_use_dataset": {"id": "Pakai dataset ini", "en": "Use this dataset"},
     "re.btn_compat_test": {"id": "Uji kompatibilitas", "en": "Test compatibility"},
     "re.btn_recheck": {"id": "Periksa ulang", "en": "Check again"},

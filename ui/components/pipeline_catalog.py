@@ -127,11 +127,6 @@ _CSS = """
     font-size: .76rem; line-height: 1.6; white-space: nowrap;
     background: rgba(127,127,127,.16); opacity: .9;
 }
-.ids-cat-count {
-    display: inline-block; font-size: .78rem; opacity: .7;
-    border-left: 3px solid var(--primary-color, currentColor);
-    padding: .1rem .6rem; margin: .1rem 0 .4rem;
-}
 .ids-cat-rows { margin: .5rem 0 .3rem; }
 .ids-cat-row {
     display: flex; gap: 1rem; align-items: baseline;
@@ -762,18 +757,6 @@ def active_filter_text(selected: dict) -> str:
     return " · ".join(parts)
 
 
-def catalog_counts(catalog) -> dict:
-    """Jumlah research pipeline & algoritma — DIHITUNG, bukan angka tetap."""
-    groups = list(catalog or [])
-    return {"research": len(groups),
-            "algorithms": sum(len(g.get("algorithms") or []) for g in groups)}
-
-
-def summary_text(counts: dict) -> str:
-    return (f"{counts.get('research', 0)} research pipeline · "
-            f"{counts.get('algorithms', 0)} algoritma tersedia")
-
-
 # ── Isi MODAL: pasangan label–nilai + bagian yang dilipat ─────────────────
 
 # Baris label–nilai tingkat RESEARCH, dengan ikon kecil sebagai penanda label.
@@ -1360,12 +1343,8 @@ def render_catalog(catalog=None, *, on_detail=None,
     catalog = build_catalog() if catalog is None else catalog
     st.markdown(_CSS, unsafe_allow_html=True)
 
-    # DUA elemen pengantar saja: satu baris hitungan + satu petunjuk singkat.
-    # Nama tombolnya sudah jelas, jadi fungsinya tidak dijelaskan lagi.
-    counts = catalog_counts(catalog)
-    st.markdown(f'<span class="ids-cat-count">{escape(summary_text(counts))}'
-                f'</span>', unsafe_allow_html=True)
-
+    # Tanpa baris hitungan ("2 research pipeline · 10 algoritma tersedia"):
+    # daftarnya sendiri sudah menunjukkan berapa yang ada.
     visible = _render_search_and_filters(catalog)
 
     requested = None

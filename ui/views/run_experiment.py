@@ -16,7 +16,6 @@ import pandas as pd
 from orchestrator.experiment_service import (
     validate_dataset_for_ui, create_and_run_experiment, get_experiment_status,
     cancel_experiment,
-    get_diag,  # [DIAG] dispatch diagnostic accessor
 )
 from orchestrator.execution_service import get_pipeline_info
 from orchestrator.validation_service import get_available_datasets
@@ -322,7 +321,7 @@ def _render_stage_columns(stages: list, view: list, running_percent: int = 0) ->
     # Fit-vs-scroll: when the pipeline has few stages let the cards stretch to
     # fill the row; when many, fix each card's width and scroll horizontally so
     # long stage titles remain readable (Jenkins Stage View pattern).
-    grow_shrink = "1 1 160px" if n <= 6 else "0 0 180px"
+    grow_shrink = "1 1 120px" if n <= 6 else "0 0 140px"
 
     cards: list[str] = []
     for i in range(n):
@@ -335,31 +334,29 @@ def _render_stage_columns(stages: list, view: list, running_percent: int = 0) ->
         safe_dur = html.escape(str(dur))
         title_attr = html.escape(f"{i + 1}. {name}", quote=True)
 
+        # Dua baris pendek: nama (satu baris, penuh di tooltip), lalu ikon
+        # dengan persen atau durasinya. Kata "selesai/berjalan/menunggu"
+        # dibuang: warna dan ikonnya sudah mengatakannya.
         if state == "running":
-            status_line = (
-                f"<div style='font-size:0.70rem; margin-top:6px;'>{icon} {label} {rp}%</div>"
-                f"<div style='height:4px; margin-top:4px; border-radius:2px; "
-                f"background:{fg}22; overflow:hidden;'>"
-                f"<div style='width:{rp}%; height:100%; background:{fg};'></div>"
-                f"</div>"
-            )
+            info = f"{icon} {rp}%"
+            bar = (f"<div style='height:3px; margin-top:4px; border-radius:2px; "
+                   f"background:{fg}22; overflow:hidden;'>"
+                   f"<div style='width:{rp}%; height:100%; background:{fg};'></div>"
+                   f"</div>")
         else:
-            status_line = (
-                f"<div style='font-size:0.70rem; margin-top:6px;'>{icon} {label}</div>"
-            )
+            info = f"{icon} {safe_dur}" if state == "done" and safe_dur not in ("", "—", "-") else icon
+            bar = ""
 
         cards.append(
-            f"<div style='flex:{grow_shrink}; min-width:160px; "
-            f"border-radius:8px; overflow:hidden; border:1px solid {fg}33; "
-            f"background:{bg}; color:{fg};'>"
-            f"<div style='padding:8px 8px 10px 8px; min-height:92px; "
-            f"display:flex; flex-direction:column;'>"
-            f"<div title='{title_attr}' style='font-size:0.72rem; font-weight:600; "
-            f"line-height:1.15; min-height:2.3em;'>{i + 1}. {safe_name}</div>"
-            f"{status_line}"
-            f"<div style='font-size:0.70rem; opacity:0.85; margin-top:auto; "
-            f"padding-top:4px;'>⏱ {safe_dur}</div>"
-            f"</div></div>"
+            f"<div title='{title_attr}' style='flex:{grow_shrink}; min-width:120px; "
+            f"border-radius:6px; overflow:hidden; border:1px solid {fg}33; "
+            f"background:{bg}; color:{fg}; padding:5px 8px 6px;'>"
+            f"<div style='font-size:0.72rem; font-weight:600; line-height:1.2; "
+            f"white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+            f"{i + 1}. {safe_name}</div>"
+            f"<div style='font-size:0.68rem; margin-top:2px; opacity:.9;'>{info}</div>"
+            f"{bar}"
+            f"</div>"
         )
 
     st.markdown(
@@ -2250,11 +2247,17 @@ def _render_execute_header() -> None:
     # Lebarnya mengikuti teksnya, sama seperti tombol kembali di halaman lain:
     # tombol selebar kolom membuat satu tombol kembali terlihat berbeda dari
     # semua tombol kembali yang lain.
-    if back_button(key="_run_back", disabled=running,
-                   help=("Eksperimen sedang berjalan: tampilan ini dikunci "
-                         "agar pantauannya tidak hilang. Selesaikan atau "
-                         "batalkan dulu sebelum kembali." if running else
-                         "Kembali ke katalog pipeline.")):
+    #
+    # Tetap aktif selama eksperimen berjalan. Kembali hanya BERHENTI MEMANTAU:
+    # eksperimennya terus berjalan di worker, dan kartu "Sedang berjalan" di
+    # sidebar membuka pantauannya lagi (sidebar_progress._open_running).
+    # Dahulu tombol ini dimatikan, sehingga pengguna terkunci di layar progres
+    # sampai run selesai atau dibatalkan.
+    if back_button(key="_run_back",
+                   help=t("re.help_back_running") if running else
+                   "Kembali ke katalog pipeline."):
+        st.session_state.pop("polling_experiment_id", None)
+        st.session_state.pop(_POLL_RENDERED_KEY, None)
         go_to_catalog()
         st.rerun()
     missed = st.session_state.get(_PENDING_MISS_KEY)
@@ -3191,20 +3194,40 @@ def _poll_experiment(experiment_id: str):
             status_data.get("pipeline_id", "")) or {}
         _stages_list = _reg_entry.get("stages", []) or []
         _pb = _compute_progress_state(status_data, _stages_list, st.session_state, experiment_id)
-        # Single GLOBAL progress bar (monotonic 0→100, never reset per stage).
-        _pct = int(round(_pb["fraction"] * 100))
-        st.progress(_pb["fraction"], text=f"Progres keseluruhan: {_pct}%")
-        # Summary line: "Fase i/N — name · Elapsed 2m 14s".
-        _summary = f"**{_pb['label']}**"
-        if _pb["elapsed_text"]:
-            _summary += f" · Elapsed {_pb['elapsed_text']}"
-        st.markdown(_summary)
-        if _pb["hint"]:
-            st.markdown(_pb["hint"])
+        # SATU baris ringkasan: fase · waktu berjalan, persen di kanannya, bilah
+        # tipis di bawahnya, tombol Batalkan di sampingnya. Dahulu bilah tebal
+        # berlabel, baris fase, catatan estimasi, judul "Tahapan pipeline", dan
+        # blok status yang bisa dibuka bertumpuk di sini, mengulang hal yang
+        # sama dengan kotak tahapan di bawahnya.
+        import html as _html
 
-        # Jenkins-style HORIZONTAL stage view (columns): done / running / waiting
-        # with per-stage duration. Per-stage start timestamps live in
-        # session_state so durations survive Streamlit reruns during polling.
+        _pct = int(round(_pb["fraction"] * 100))
+        _ringkas = _pb["label"]
+        if _pb["elapsed_text"]:
+            _ringkas += f" · {_pb['elapsed_text']}"
+        if status == "QUEUED":
+            _ringkas = t("ps.msg_waiting_worker")
+        kiri, kanan = st.columns([6, 1], vertical_alignment="center")
+        kiri.markdown(
+            f'<div class="ids-run-foot"><span class="ids-run-phase">'
+            f'{_html.escape(_ringkas)}</span>'
+            f'<span class="ids-run-pct">{_pct}%</span></div>'
+            f'<div class="ids-run-track"><div class="ids-run-fill" '
+            f'style="width:{max(0, min(100, _pct))}%"></div></div>',
+            unsafe_allow_html=True)
+        if kanan.button(t("ps.btn_cancel_short"), key=f"cancel_poll_{experiment_id}",
+                        use_container_width=True):
+            r = cancel_experiment(experiment_id)
+            if r["success"]:
+                st.session_state.pop("polling_experiment_id", None)
+                st.warning(t("re.msg_exp_cancelled"))
+            else:
+                st.error(r["message"])
+            st.rerun()
+
+        # Kotak tahapan (selesai / berjalan / menunggu) beserta durasinya.
+        # Waktu mulai tiap tahap disimpan di session_state supaya durasinya
+        # bertahan melewati rerun selama pemantauan.
         if _stages_list:
             from workers.progress_util import build_stage_view
             _starts_key = f"_stage_starts_{experiment_id}"
@@ -3214,45 +3237,13 @@ def _poll_experiment(experiment_id: str):
             if isinstance(_ci, int) and _ci >= 1:
                 _starts.setdefault(_ci, _now)  # first time we observe this stage
             _view = build_stage_view(len(_stages_list), _ci, status, _starts, _now)
-            st.markdown("**Tahapan pipeline**")
             _render_stage_columns(_stages_list, _view, _pb.get("stage_percent", 0))
-
-        with st.status(f"Experiment {status.lower()}...", expanded=False):
-            st.write(f"**Experiment ID:** `{experiment_id[:8]}...`")
-            st.write(f"**Status:** {status}")
-            if status == "QUEUED":
-                st.write("Waiting for worker to pick up the task...")
-            else:
-                # Show the last reported stage message if the worker sent one.
-                # Suppress internal [DIAG] scaffolding strings from the UI.
-                _cp = status_data.get("celery_progress") or {}
-                _msg = _cp.get("message") or status_data.get("celery_stage")
-                if _msg and str(_msg).startswith("[DIAG]"):
-                    _msg = "Menyiapkan eksekusi…"
-                if _msg:
-                    st.write(f"**Current step:** {_msg}")
-                else:
-                    st.write("Pipeline is executing. This may take several minutes...")
-            _iv = _get_poll_interval(status_data.get("pipeline_id", ""))
-            st.write(f"This page auto-refreshes about every {_iv} seconds.")
-        if st.button(t("re.btn_cancel_exp"), key=f"cancel_poll_{experiment_id}"):
-            r = cancel_experiment(experiment_id)
-            if r["success"]:
-                st.session_state.pop("polling_experiment_id", None)
-                st.warning(t("re.msg_exp_cancelled"))
-            else:
-                st.error(r["message"])
-            st.rerun()
 
         # Popup tanda hidup: TAMBAHAN di atas tampilan pemuatan di atas, yang
         # tidak diubah. Tidak menggambar apa pun kecuali run diam atau
         # workernya berhenti (ui/components/liveness.py).
         from ui.components.liveness import maybe_show_liveness_popup
         maybe_show_liveness_popup(status_data)
-
-        # [DIAG] Diagnostic block — visible on every poll tick. Removable
-        # in one grep pass (search for "[DIAG]"). No expander, no collapse.
-        _render_diag_block(experiment_id, status_data)
 
         pipeline_id = status_data.get("pipeline_id", "")
         interval = _get_poll_interval(pipeline_id)
@@ -3284,73 +3275,6 @@ def _poll_experiment(experiment_id: str):
             st.warning(t("re.msg_exp_was_cancelled"))
         else:
             st.error(f"Experiment failed: {error_msg}")
-
-
-def _render_diag_block(experiment_id: str, status_data: dict) -> None:
-    """[DIAG] Render the diagnostic block on the Run Experiment page.
-
-    Shows everything needed to identify which link in the dispatch chain
-    is broken: env-var, orchestrator branch, task_id, DB status, worker
-    entered marker, raw AsyncResult.
-
-    Wrapped inside an expander (default closed) so the long dict dump does
-    not dominate the main view during polling. Information is preserved
-    in full; only the visual default changed.
-    """
-    import os
-
-    # 1. What the Streamlit process sees in its own environment, RIGHT NOW.
-    env_use_async = os.environ.get("USE_ASYNC")
-
-    # 2. What config.celery_config bound at import time (frozen for life of process).
-    try:
-        from config.celery_config import USE_ASYNC as cfg_use_async
-    except Exception as e:  # defensive — should never fail
-        cfg_use_async = f"<import error: {e}>"
-
-    # 3. What the orchestrator stashed at dispatch.
-    diag = get_diag(experiment_id)
-    branch = diag.get("branch")
-    task_id = diag.get("task_id")
-    diag_use_async = diag.get("USE_ASYNC")
-
-    # 4. Raw AsyncResult — proves whether the worker has actually entered
-    # the task body. The `[DIAG] worker task entered` marker is written
-    # as the literal first statement of run_pipeline_task.
-    raw_state = None
-    raw_info = None
-    worker_entered = False
-    if task_id:
-        try:
-            from workers.celery_worker import app as celery_app
-            ar = celery_app.AsyncResult(task_id)
-            raw_state = ar.state
-            raw_info = ar.info
-            if isinstance(raw_info, dict):
-                stage = raw_info.get("stage", "")
-                # Any PROGRESS state at all proves the worker ran the
-                # first statement of the task body.
-                if "worker task entered" in str(stage) or raw_state == "PROGRESS":
-                    worker_entered = True
-            elif raw_state in ("STARTED", "SUCCESS", "PROGRESS"):
-                worker_entered = True
-        except Exception as e:
-            raw_info = f"<AsyncResult error: {e}>"
-
-    st.markdown("---")
-    with st.expander(t("re.dlg_diag_detail"), expanded=False):
-        st.write(f"**os.environ.get('USE_ASYNC')** (Streamlit process env): `{env_use_async!r}`")
-        st.write(f"**config.celery_config.USE_ASYNC** (frozen at import): `{cfg_use_async!r}`")
-        st.write(f"**Dispatched branch** (from orchestrator stash): `{branch!r}`")
-        st.write(f"**Dispatch-time USE_ASYNC** (from orchestrator stash): `{diag_use_async!r}`")
-        st.write(f"**task_id**: `{task_id!r}`")
-        st.write(f"**DB status**: `{status_data.get('status')!r}`")
-        st.write(f"**worker task started**: `{'yes' if worker_entered else 'no'}`")
-        st.write(f"**raw AsyncResult.state**: `{raw_state!r}`")
-        st.write("**raw AsyncResult.info**:")
-        st.code(repr(raw_info), language="python")
-        st.write("**status_data** (full dict from get_experiment_status):")
-        st.json(status_data)
 
 
 def _render_result_mode_banner(experiment_id: str) -> None:
