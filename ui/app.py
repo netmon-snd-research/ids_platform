@@ -158,7 +158,7 @@ from ui.views.login import (
 )
 from ui.components import theme
 from ui.components.sidebar_progress import render_sidebar_progress
-from ui.components.sidebar_chrome import menu_styles, render_brand
+from ui.components.sidebar_chrome import render_brand
 from ui.components.page_flags import drop_stale_page_flags
 from ui.components.device import render_device_cookie
 from ui.i18n import t
@@ -174,14 +174,10 @@ theme.inject()
 restore_login()
 
 # ── Sidebar navigation ────────────────────────────────────────────────────
-# Centralised routing: option_menu returns the selected label, and a single
-# dispatch table below routes to each page's render() function. The two
-# pages are independent modules in ui/views/. No ui/pages/ folder is used,
-# so there is no conflict with Streamlit's built-in multipage navigation.
-#
-# Defensive: if streamlit-option-menu is not installed (e.g. an older clone
-# of the repo without the dep installed), fall back to a plain radio so the
-# app stays usable and the user gets a clear hint to install it.
+# Centralised routing: the sidebar menu sets the active page, and a single
+# dispatch table below routes to each page's render() function. The pages are
+# independent modules in ui/views/. No ui/pages/ folder is used, so there is
+# no conflict with Streamlit's built-in multipage navigation.
 
 # Nama halaman ini adalah PENGENAL, bukan teks tampilan: ia dipakai untuk
 # routing, disimpan di session_state, dan dibaca test. Karena itu ia TIDAK
@@ -190,7 +186,8 @@ restore_login()
 # memutus routing begitu bahasa berganti.
 _PAGES = ("Progress & Status", "Run Experiment", "Add Pipeline & Dataset")
 _PAGE_LABEL_KEYS = ("nav.progress", "nav.run_experiment", "nav.contribute")
-_PAGE_ICONS = ("speedometer2", "play-circle", "plus-square")
+_PAGE_ICONS = (":material/speed:", ":material/play_circle:",
+               ":material/add_box:")
 
 
 def _page_labels() -> list[str]:
@@ -200,16 +197,6 @@ def _page_labels() -> list[str]:
 # dashboard (all experiments + live progress); index is resolved by name so menu
 # order can change freely without breaking the default.
 _DEFAULT_PAGE = "Progress & Status"
-
-try:
-    from streamlit_option_menu import option_menu
-    _OPTION_MENU_AVAILABLE = True
-except Exception as _e:
-    option_menu = None
-    _OPTION_MENU_AVAILABLE = False
-    logger.warning("streamlit-option-menu not available, falling back to radio: %s", _e)
-
-
 
 _CURRENT_PAGE_KEY = "_current_page"
 
@@ -238,40 +225,35 @@ def _requested_index():
 
 
 def _select_page() -> str:
-    """Menu tiga halaman. Perilakunya TIDAK berubah — urutan, halaman default,
-    dan mekanisme perpindahannya persis sama; yang diganti hanya gayanya
-    (lihat ui/components/sidebar_chrome.menu_styles).
+    """Menu tiga halaman sebagai TOMBOL BAWAAN Streamlit.
 
-    Judul "Main Menu" dilepas karena jejak lokasi di atasnya sudah memberi tahu
-    pengguna ia sedang di mana — dua label berturut-turut hanya menambah bising.
+    Dahulu `streamlit-option-menu`: komponen iframe yang mengunduh JavaScript
+    (±2 MB) dan font ikonnya sendiri pada SETIAP pemuatan halaman, sehingga
+    di jaringan lambat menunya kosong beberapa detik. Tombol bawaan memakai
+    bundel Streamlit yang sudah di-cache peramban, jadi menunya tampil
+    seketika. Rupanya (item aktif berlatar lembut, tebal, bergaris aksen di
+    kiri) diatur `.st-key-ids_nav` di theme.py.
+
+    Urutan, halaman bawaan, dan mekanisme perpindahan tidak berubah.
+    Permintaan pindah dari LUAR menu (kartu eksperimen di sidebar, tombol
+    Pilih dataset) diterapkan lebih dulu lewat `_requested_index`.
     """
-    if _OPTION_MENU_AVAILABLE:
-        with st.sidebar:
-            # Menu menampilkan LABEL, lalu hasilnya dipetakan kembali ke
-            # pengenal halaman lewat posisinya. Pemetaan by-posisi inilah yang
-            # membuat berpindah bahasa tidak memindahkan halaman: posisi yang
-            # terpilih tidak berubah, hanya tulisannya.
-            labels = _page_labels()
-            # Permintaan pindah dari LUAR menu (kartu eksperimen berjalan di
-            # sidebar). `manual_select` adalah satu-satunya jalan menggeser
-            # pilihan `option_menu` dari kode: menulis `_CURRENT_PAGE_KEY`
-            # saja tidak cukup, sebab nilai widget menang atas session_state.
-            diminta = _requested_index()
-            chosen = option_menu(
-                menu_title=None,
-                options=labels,
-                icons=list(_PAGE_ICONS),
-                default_index=_remembered_index(),
-                styles=menu_styles(),
-                manual_select=diminta,
-            )
-            return _PAGES[labels.index(chosen)] if chosen in labels else _DEFAULT_PAGE
-    # Fallback path
-    st.sidebar.caption(t("app.menu_missing"))
+    diminta = _requested_index()
+    if diminta is not None:
+        st.session_state[_CURRENT_PAGE_KEY] = _PAGES[diminta]
+    aktif = _PAGES[_remembered_index()]
+
     labels = _page_labels()
-    chosen = st.sidebar.radio(t("nav.section"), labels,
-                              index=_remembered_index())
-    return _PAGES[labels.index(chosen)] if chosen in labels else _DEFAULT_PAGE
+    with st.sidebar:
+        with st.container(key="ids_nav"):
+            for i, (nama, label, ikon) in enumerate(zip(_PAGES, labels, _PAGE_ICONS)):
+                # Kunci berbeda untuk item aktif: itulah kait CSS-nya.
+                kunci = f"_nav_{i}_on" if nama == aktif else f"_nav_{i}"
+                if st.button(label, key=kunci, icon=ikon, type="tertiary",
+                             use_container_width=True) and nama != aktif:
+                    st.session_state[_CURRENT_PAGE_KEY] = nama
+                    st.rerun()
+    return aktif
 
 
 # Blok 1 dari sidebar: logo + nama aplikasi, lalu menu tiga halaman.

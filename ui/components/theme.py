@@ -887,8 +887,8 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 }}
 /* Daftar eksperimen berjalan (wadah bergulir di sidebar, kunci
    `ids_run_scroll`) mengisi ruang sampai sedikit di atas garis blok akun,
-   bukan berhenti di 210 px. Angkanya diukur: puncak daftar 323 px dari atas
-   (logo + menu), garis blok akun yang menempel 240 px dari dasar, sisakan
+   bukan berhenti di 210 px. Angkanya diukur: puncak daftar 260 px dari atas
+   (logo + menu), garis blok akun yang menempel 170 px dari dasar, sisakan
    ±17 px. Daftar yang isinya lebih pendek berhenti di kartu terakhirnya. Di layar
    pendek tingginya tetap minimal 210 px; blok akun yang menempel menutup
    ujungnya, dan isinya tetap dapat digulir. */
@@ -896,9 +896,27 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
    wadah berkuncinya; keduanya diatur supaya wadah dalam ikut memanjang. */
 [data-testid="stLayoutWrapper"]:has(> .st-key-ids_run_scroll),
 .st-key-ids_run_scroll {{
-    height: max(210px, calc(100vh - 580px)) !important;
+    height: max(210px, calc(100vh - 447px)) !important;
 }}
 .ids-mode-anchor {{ display: none; }}
+/* Blok akun lebih RAPAT. Dua penanda tak terlihat (jangkar & label mode)
+   masing-masing menempati satu pembungkus setinggi 0 px yang tetap dikenai
+   celah 16 px; pembungkusnya disembunyikan dan celahnya dikecilkan. Garis
+   pemisahnya juga tidak lagi memakan ±49 px. */
+[data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) > [data-testid="stVerticalBlock"] {{
+    gap: .5rem;
+}}
+[data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) .stElementContainer:has(.ids-mode-anchor),
+[data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) .stElementContainer:has(.ids-mode-label) {{
+    display: none;
+}}
+[data-testid="stLayoutWrapper"]:has(.ids-mode-anchor) hr {{ margin: .25rem 0 .5rem; }}
+
+/* Kartu eksperimen berjalan: pembungkus markdown Streamlit bermargin bawah
+   -16 px, sehingga kotak kartu meluber 16 px keluar wadahnya dan kartu
+   berikutnya menimpanya. Untuk kartu, margin itu dinolkan. */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]:has(.ids-run),
+[data-testid="stSidebar"] *:has(> .ids-run) {{ margin-bottom: 0 !important; }}
 
 /* ── Chip katalog: penanda asal & keadaan ──────────────────────────────── */
 /* Keadaan TIDAK disampaikan lewat warna saja: setiap chip bermasalah juga
@@ -1764,35 +1782,30 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
 /* KOTAKNYA. Dipasang pada elemen kartu, bukan pada wadah Streamlit, sehingga
    tepinya selalu mengikuti tinggi isinya — berapa pun baris yang tergambar. */
 .ids-run {{
-    line-height: 1.3;
+    line-height: 1.35;
     border: 1px solid rgba(127,127,127,.20);
     border-radius: 12px;
     background: {TINT_NEUTRAL};
-    padding: .5rem .7rem .6rem;
+    padding: .7rem .85rem .8rem;
 }}
-/* Jarak antar kartu saat beberapa run berjalan sekaligus. Cukup untuk
-   memisahkan, tidak sampai membuat tumpukannya memakan sidebar. */
-[data-testid="stSidebarUserContent"]
-    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card)
-    + div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card) {{
-    margin-top: .4rem;
-}}
-.ids-run-live {{
-    display: flex;
-    align-items: center;
-    gap: .35rem;
+/* Baris kedua kartu: judul research pipeline, lebih kecil dan redup. */
+.ids-run-sub {{
     font-size: {FONT_CAPTION};
-    opacity: .55;
+    opacity: .6;
+    margin-top: .15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }}
-.ids-run-dot {{
-    width: 6px; height: 6px; border-radius: 999px; flex: 0 0 6px;
-    background: rgb(52,168,83);
-    animation: ids-run-pulse 1.8s ease-in-out infinite;
-}}
-@keyframes ids-run-pulse {{
-    0%, 100% {{ opacity: 1; }}
-    50%      {{ opacity: .25; }}
-}}
+/* Jarak di dalam KARTU SIDEBAR saja; kelas foot/track juga dipakai tampilan
+   progres di halaman utama. */
+.ids-run .ids-run-foot {{ margin-top: .6rem; }}
+.ids-run .ids-run-track {{ margin-top: .4rem; }}
+/* Jarak antar kartu saat beberapa run berjalan sekaligus, dipasang pada
+   WADAH daftarnya (bergulir: `ids_run_scroll`, biasa: `ids_run_list`).
+   Aturan saudara-bersebelahan yang dulu tidak lagi cocok: Streamlit 1.65
+   membungkus tiap kartu dengan stLayoutWrapper. */
+.st-key-ids_run_scroll, .st-key-ids_run_list {{ gap: .6rem; }}
 /* Identitas run: pipeline · dataset pada SATU baris, dipotong ellipsis.
    Membungkus akan menaikkan tinggi kartu mengikuti panjang nama — dan kartu
    yang tingginya berbeda-beda membuat tumpukan beberapa run terbaca miring. */
@@ -1806,12 +1819,6 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
     font-size: {FONT_BODY};
     margin-top: .1rem;
 }}
-/* Titik tengah pemisah: yang memisahkan "pipeline mana" dari "atas data
-   mana". Ia tanda baca, jadi ia lebih redup daripada keduanya. */
-.ids-run-dot-sep {{ opacity: .35; margin: 0 .3rem; }}
-/* Dataset ikut di baris yang sama, tetapi lebih redup: yang dicari mata lebih
-   dulu adalah nama pipeline-nya. */
-.ids-run-ds {{ font-weight: {WEIGHT_NORMAL}; opacity: .6; }}
 /* Kartu yang SEDANG dipantau. Tepi tipis, bukan latar pekat: ia menjawab
    "yang ini", bukan "yang ini penting". Dipasang pada kartunya sendiri,
    sepasang dengan kotaknya. */
@@ -1855,9 +1862,6 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
     [data-testid="{SEG_GROUP}"] button {{
         transition: none !important;
     }}
-    /* Titik berdenyut BERHENTI, tetapi tidak hilang: ia tetap penanda bahwa
-       ada yang berjalan, dan itu keterangan — bukan hiasan. */
-    .ids-run-dot {{ animation: none !important; }}
 }}
 
 /* Redup bawaan Streamlit pada elemen basi (rerun > 0,5 detik) SENGAJA tidak
@@ -1891,16 +1895,61 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
 @media (prefers-reduced-motion: reduce) {{
     [data-testid="stSkeleton"] {{ animation: none; }}
 }}
-/* Di SIDEBAR kerangkanya tidak terlihat sama sekali: menu yang sedang dimuat
-   cukup berupa ruang kosong, tanpa kotak, tulisan, atau denyut. Tingginya
-   disamakan dengan wadah menu tiga halaman yang sudah termuat (±177 px), supaya
-   kartu eksperimen di bawahnya tidak meloncat turun begitu menunya muncul. */
-[data-testid="stSidebar"] [data-testid="stSkeleton"] {{
-    background: transparent;
-    animation: none;
-    height: 177px;
+/* ── Tombol IKON (pengganti tombol berlabel) ───────────────────────────
+   Auto-refresh, Perbarui, Bersihkan penyaring, Batalkan, dan Kembalikan ke
+   bawaan tampil sebagai ikon. Ikon telanjang mudah terbaca sebagai hiasan,
+   jadi masing-masing diberi kotak berlatar lembut supaya jelas dapat
+   ditekan. Batalkan (x) memerah saat disorot: ia menghentikan sesuatu. */
+.st-key-_dash_auto_btn button, .st-key-_dash_refresh button,
+.st-key-_cat_clear button, [class*="st-key-_pov_reset_"] button,
+[class*="st-key-cancel_poll_"] button, [class*="st-key-dash_cancel_"] button {{
+    width: 34px;
+    height: 34px;
+    min-height: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid rgba(127,127,127,.28);
+    background: rgba(127,127,127,.14);
+    color: inherit;
 }}
-[data-testid="stSidebar"] [data-testid="stSkeleton"]::after {{ content: none; }}
+.st-key-_dash_auto_btn button:hover, .st-key-_dash_refresh button:hover,
+.st-key-_cat_clear button:hover, [class*="st-key-_pov_reset_"] button:hover {{
+    background: rgba(127,127,127,.26);
+    color: inherit;
+}}
+[class*="st-key-cancel_poll_"] button:hover,
+[class*="st-key-dash_cancel_"] button:hover {{
+    background: rgba(255, 75, 75, .18);
+    border-color: rgba(255, 75, 75, .45);
+    color: rgb(255, 75, 75);
+}}
+.st-key-_cat_clear button:disabled {{ opacity: .4; }}
+
+/* ── Menu halaman di sidebar (tombol bawaan, kunci `ids_nav`) ──────────
+   Pengganti streamlit-option-menu, dengan rupa yang sama: item rata kiri,
+   item aktif berlatar lembut, tebal, dan bergaris aksen di kiri. Item aktif
+   dikenali dari kuncinya (`_nav_<i>_on`). */
+.st-key-ids_nav {{ gap: 2px; }}
+/* Margin tombol umum aplikasi (±5,6 px atas & bawah) membuat jarak antar-item
+   menu renggang; di menu ini jaraknya cukup dari celah 2 px di atas. */
+.st-key-ids_nav .stButton {{ margin: 0; }}
+.st-key-ids_nav button {{
+    justify-content: flex-start;
+    padding: 7px 7px;
+    min-height: 0;
+    border-radius: 6px;
+    border-left: 3px solid transparent;
+    color: inherit;
+}}
+.st-key-ids_nav button > div {{ justify-content: flex-start; }}
+.st-key-ids_nav button p {{ font-size: .875rem; font-weight: 400; }}
+.st-key-ids_nav button:hover {{ background: rgba(127,127,127,.12); color: inherit; }}
+.st-key-ids_nav [class*="_on"] button {{
+    background: rgba(127,127,127,.18);
+    border-left-color: rgb(255, 75, 75);
+}}
+.st-key-ids_nav [class*="_on"] button p {{ font-weight: 600; }}
 </style>
 """
 

@@ -25,7 +25,6 @@ CATALOG: dict[str, dict[str, str]] = {
     # ── Navigasi ─────────────────────────────────────────────────────────
     # Nama halaman. Dipakai menu sidebar DAN jejak lokasi, jadi keduanya tidak
     # mungkin berbeda sebutan.
-    "nav.section": {"id": "Navigasi", "en": "Navigation"},
     "nav.run_experiment": {"id": "Jalankan Eksperimen", "en": "Run Experiment"},
     "app.loading": {"id": "Memuat…", "en": "Loading…"},
     "nav.progress": {"id": "Progres & Status", "en": "Progress & Status"},
@@ -37,15 +36,12 @@ CATALOG: dict[str, dict[str, str]] = {
     # "Menu" seperti sebelumnya: Tahap 1 menerjemahkan, bukan mengganti kata.
 
     # ── Blok sidebar ─────────────────────────────────────────────────────
-    "sidebar.progress_title": {"id": "Sedang berjalan", "en": "Running now"},
     # Label tombol yang menumpang kartu eksperimen berjalan. Tidak pernah
     # terlihat — CSS membuatnya tembus pandang — tetapi pembaca layar
     # membacanya, jadi ia menyebut TUJUANNYA, bukan "buka".
     "sidebar.progress_open": {
         "id": "Buka eksperimen yang sedang berjalan",
         "en": "Open the running experiment"},
-    "sidebar.progress_empty": {"id": "Tidak ada eksperimen berjalan",
-                               "en": "No experiments running"},
     "sidebar.identity_title": {"id": "Identitas", "en": "Identity"},
     "sidebar.language_title": {"id": "Bahasa", "en": "Language"},
 
@@ -1350,12 +1346,6 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Teks tertanam yang dipindahkan, batch 1  (Tahap 3A) ──────────────
-    "app.menu_missing": {
-        "id": "Catatan: streamlit-option-menu belum terpasang. Jalankan "
-              "`pip install streamlit-option-menu` untuk tampilan menu yang "
-              "lengkap.",
-        "en": "Note: streamlit-option-menu is not installed. Run "
-              "`pip install streamlit-option-menu` for the full menu."},
     "ctx.after_upload_q": {
         "id": "Apa yang terjadi setelah saya mengunggah?",
         "en": "What happens after I upload?"},

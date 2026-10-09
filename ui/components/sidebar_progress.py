@@ -69,16 +69,6 @@ SUBTITLE_CHARS = 20
 #: persentase di kanannya keluar baris.
 PHASE_CHARS = 22
 
-# Judul blok — gaya seragam dengan judul blok lain di sidebar.
-# Teks bahasa BAWAAN. Konstanta modul dievaluasi sekali saat impor, jadi ia
-# tidak boleh menjadi hasil `t()` — nilainya akan terkunci pada bahasa yang
-# kebetulan aktif saat modul pertama diimpor. Perenderannya memanggil `t()`;
-# konstanta ini tetap ada sebagai nilai bahasa Indonesia dan sebagai kunci
-# terjemahannya.
-TITLE_TEXT = "Sedang berjalan"
-TITLE_KEY = "sidebar.progress_title"
-EMPTY_TEXT = "Tidak ada eksperimen berjalan"
-EMPTY_KEY = "sidebar.progress_empty"
 UNAVAILABLE_TEXT = "Status tidak tersedia"
 
 #: Label tombol yang MENUMPANG kartu. Tidak pernah terlihat — CSS membuatnya
@@ -135,6 +125,8 @@ def build_progress_view(experiments, *, status_reader=None, can_read_progress=Tr
         status = status_data.get("status") or e.get("status") or "-"
         rows.append({
             "experiment_id": e.get("id"),
+            "pipeline_id": e.get("pipeline_id"),
+            "dataset_type": e.get("dataset_type"),
             "title": shorten(e.get("pipeline_id"), TITLE_CHARS) or "?",
             "dataset": shorten(e.get("dataset_type"), SUBTITLE_CHARS),
             "status": status,
@@ -229,8 +221,37 @@ def load_progress_view() -> dict:
 
     view = build_progress_view(rows, status_reader=_status_reader(),
                                can_read_progress=can_read)
+    # Kartu menyebut ALGORITMA dan JUDUL research pipeline-nya, bukan
+    # pengenal mesin ("hikari2021.rfc_pipeline · HIKARI2021"). Pengenal yang
+    # tidak terpetakan dipakai apa adanya.
+    algoritma = _algorithm_names()
+    for row in view["rows"]:
+        pid, dtype = row.get("pipeline_id"), row.get("dataset_type")
+        row["title"] = algoritma.get(pid) or row["title"]
+        row["dataset"] = _research_title(dtype) if dtype else row["dataset"]
     view["error"] = False
     return view
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _algorithm_names() -> dict:
+    """{pipeline_id: nama algoritma} dari registry gabungan. Ber-TTL karena
+    registry berubah saat pengajuan disetujui."""
+    try:
+        from orchestrator.dynamic_registry import get_all_pipelines
+        return {pid: str(info.get("algorithm") or info.get("name") or pid)
+                for pid, info in (get_all_pipelines() or {}).items()}
+    except Exception:                       # pragma: no cover - defensif
+        return {}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _research_title(dataset_type: str) -> str:
+    try:
+        from orchestrator.research_registry import title_for
+        return title_for(dataset_type)
+    except Exception:                       # pragma: no cover - defensif
+        return str(dataset_type)
 
 
 # ── Perenderan ────────────────────────────────────────────────────────────
@@ -257,8 +278,9 @@ def phase_text(row: dict) -> str:
 def run_card_html(row: dict, *, aktif: bool = False) -> str:
     """Kartu satu eksperimen berjalan. MURNI: string, tanpa Streamlit.
 
-    Empat baris, semuanya pendek: penanda hidup, nama pipeline, nama dataset,
-    lalu fase berdampingan dengan persentasenya di atas bar tipis.
+    Tiga baris pendek: nama algoritma, judul research pipeline-nya, lalu
+    fase berdampingan dengan persentasenya di atas bar tipis. Label "Sedang
+    berjalan" dibuang: kartunya sendiri, di bagian ini, sudah berarti itu.
 
     Yang SENGAJA tidak ada di sini: waktu berjalan, nomor fase, status mentah
     di samping fase, dan keterangan broker. Sidebar bukan tempat melaporkan —
@@ -272,14 +294,9 @@ def run_card_html(row: dict, *, aktif: bool = False) -> str:
     lebar = max(0, min(100, int(pct))) if ada_pct else 0
 
     kanan = (f'<span class="ids-run-pct">{lebar}%</span>' if ada_pct else "")
-    # Pipeline DAN dataset pada SATU baris, dipisah titik tengah. Keduanya
-    # bersama-sama adalah identitas run ini — "pipeline mana atas data mana" —
-    # dan memecahnya menjadi dua baris membuat mata membacanya sebagai dua
-    # fakta terpisah, sekaligus menambah tinggi tiap kartu.
     nama = escape(str(row.get("title") or "?"))
-    if row.get("dataset"):
-        nama += (f'<span class="ids-run-dot-sep">·</span>'
-                 f'<span class="ids-run-ds">{escape(str(row["dataset"]))}</span>')
+    sub = (f'<div class="ids-run-sub">{escape(str(row["dataset"]))}</div>'
+           if row.get("dataset") else "")
     # Bar hanya digambar bila persentasenya diketahui: jalur kosong yang tidak
     # pernah terisi terbaca seperti progres yang macet di nol.
     bar = (f'<div class="ids-run-track">'
@@ -293,9 +310,7 @@ def run_card_html(row: dict, *, aktif: bool = False) -> str:
     kelas = "ids-run ids-run--active" if aktif else "ids-run"
     return (
         f'<div class="{kelas}">'
-        '<div class="ids-run-live"><span class="ids-run-dot"></span>'
-        f'{escape(t(TITLE_KEY))}</div>'
-        f'<div class="ids-run-name">{nama}</div>'
+        f'<div class="ids-run-name">{nama}</div>{sub}'
         f'<div class="ids-run-foot">'
         f'<span class="ids-run-phase">{escape(phase_text(row))}</span>{kanan}'
         f'</div>{bar}'
@@ -359,7 +374,8 @@ def render_progress_block() -> None:
         render_line(UNAVAILABLE_TEXT, muted=True, small=True)
         return
     if not view["rows"]:
-        render_line(t(EMPTY_KEY), muted=True, small=True)
+        # Tanpa kalimat "Tidak ada eksperimen berjalan": bagian yang kosong
+        # sudah mengatakannya, dan kalimat itu hanya menambah satu baris.
         return
 
     # SATU kartu per eksperimen. Menggabungkan beberapa run ke dalam satu
@@ -372,7 +388,7 @@ def render_progress_block() -> None:
     # mendorong pengalih bahasa dan pemilih peran keluar dari pandangan —
     # navigasi kalah oleh sesuatu yang hanya berlangsung beberapa menit.
     wadah = (st.container(height=SCROLL_HEIGHT, border=False, key="ids_run_scroll")
-             if len(rows) > VISIBLE_CARDS else st.container())
+             if len(rows) > VISIBLE_CARDS else st.container(key="ids_run_list"))
     with wadah:
         for row in rows:
             eid = row.get("experiment_id")

@@ -44,7 +44,6 @@ from ui.components.sections import (
     back_button, card_labels, mobile_card_labels, render_facts,
     render_section, section_body,
 )
-from streamlit_option_menu import option_menu
 from contracts.dataset_schemas import get_schema
 # Helper murni untuk penyajian diagnosa (aturan format per dataset_type +
 # pembersih nilai mentah). `diagnose_all` sendiri tetap diimpor secara lazy di
