@@ -247,18 +247,6 @@ SEG_ITEM_ACTIVE = "stBaseButton-segmented_controlActive"
 DROPDOWN_ID = "stSelectboxVirtualDropdown"
 SELECT_ID = "stSelectbox"
 
-# Kunci widget pemilih dataset di halaman Run Experiment. Streamlit menempelkan
-# kelas `st-key-<key>` pada wadah widget ber-key, jadi ini cara MENYASAR SATU
-# widget tanpa menyeret dropdown lain (mis. pemilih mode di sidebar) ikut
-# membesar. Pola kelasnya juga diverifikasi terhadap bundel terpasang.
-DATASET_SELECT_KEY = "dataset_select"
-DATASET_SELECT_SCOPE = f"st-key-{DATASET_SELECT_KEY}"
-
-# Tinggi kontrol pemilih dataset: nyaman ditekan & dibaca, tetapi tidak sampai
-# mengubah tinggi baris elemen di sekitarnya. Ukuran TEKS-nya memakai
-# `FONT_BODY` — aplikasi ini hanya mengenal empat tingkat ukuran teks, dan
-# menambah tingkat kelima justru merusak konsistensi yang sedang dijaga.
-SELECT_BIG_H = "3rem"
 
 # Kelas penanda wadah isi bagian (lihat ui/components/sections.py).
 SECTION_BODY_CLASS = "ids-section-body"
@@ -989,22 +977,6 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}}
-
-/* ── Pemilih dataset (Run Experiment): kontrol BESAR ───────────────────
-   Disasar lewat kelas `st-key-...` sehingga hanya widget ini yang membesar —
-   pemilih mode di sidebar dan selectbox lain tidak ikut terpengaruh. */
-.{DATASET_SELECT_SCOPE} [data-testid="{SELECT_ID}"],
-.{DATASET_SELECT_SCOPE} [data-baseweb="select"] {{
-    width: 100%;                         /* mengisi kolomnya, tidak menyempit */
-    max-width: none;
-}}
-.{DATASET_SELECT_SCOPE} [data-baseweb="select"] > div {{
-    min-height: {SELECT_BIG_H};          /* tinggi nyaman ditekan & dibaca */
-    font-size: {FONT_BODY};              /* naik dari bawaan Streamlit */
-}}
-.{DATASET_SELECT_SCOPE} label {{
-    font-size: {FONT_BODY};              /* labelnya ikut terbaca */
 }}
 
 /* ── Pola BAKU judul bagian ────────────────────────────────────────────

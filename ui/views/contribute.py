@@ -4124,8 +4124,6 @@ def _render_dataset_upload_tab() -> None:
     if save_name != safe:
         st.info(t("ap.msg_renamed", filename=safe, new=save_name))
     target = _dataset_target_path(save_name)
-    if not diag.get("compatible_types"):
-        st.warning(t("ap.msg_not_compatible_yet"))
     user = current_user()
     if not can_upload(user):
         render_login_prompt(
@@ -4473,7 +4471,7 @@ def _maybe_render_compat_dialog(diag: dict) -> None:
         # Dataset berganti sejak barisnya diklik — jangan sajikan hasil basi.
         dlg.close_dialog(dlg.COMPAT_KEY)
         return
-    _compat_dialog(diag, dtype, algorithms=_algorithms_for(dtype))
+    _compat_dialog(diag, dtype)
 
 
 def _render_compatibility(diag: dict) -> None:
@@ -4494,10 +4492,9 @@ def _render_compatibility(diag: dict) -> None:
         st.warning(diag.get("error") or "Diagnosa kecocokan tidak tersedia.")
         return
 
-    compatible = diag.get("compatible_types") or []
+    # Tanpa kotak peringatan: pil "Tidak cocok" di setiap baris sudah
+    # menyatakannya, beserta sebab dan langkah perbaikannya.
     st.subheader(t("ap.sec_compatibility"))
-    if not compatible:
-        st.warning(t("ap.msg_no_match_anywhere"))
 
     lebar = [b for _, b in _COMPAT_COLUMNS]
 

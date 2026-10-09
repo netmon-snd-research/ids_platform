@@ -288,18 +288,14 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.ds_private": {"id": "🔒 Privat", "en": "🔒 Private"},
     "re.ds_private_of": {"id": "🔒 Privat · {owner}", "en": "🔒 Private · {owner}"},
     "re.btn_delete_dataset": {"id": "Hapus", "en": "Delete"},
-    "re.ds_delete_confirm": {
-        "id": "Hapus **{filename}**? Berkasnya dihapus dari server dan tidak "
-              "dapat dikembalikan.",
-        "en": "Delete **{filename}**? The file is removed from the server and "
-              "cannot be restored."},
+    "re.ds_delete_confirm": {"id": "Hapus **{filename}** permanen?",
+                             "en": "Permanently delete **{filename}**?"},
     "re.ds_delete_used": {
-        "id": "{count} eksperimen memakai dataset ini. Hasilnya tetap "
-              "tersimpan, tetapi tidak dapat dijalankan ulang.",
-        "en": "{count} experiments used this dataset. Their results are kept, "
-              "but they can no longer be re-run."},
-    "re.ds_deleted": {"id": "**{filename}** sudah dihapus.",
-                      "en": "**{filename}** was deleted."},
+        "id": "Hasil {count} eksperimennya tetap tersimpan.",
+        "en": "Results of its {count} experiments are kept."},
+    "re.btn_confirm_delete": {"id": "Ya, hapus", "en": "Yes, delete"},
+    "re.ds_deleted": {"id": "**{filename}** dihapus.",
+                      "en": "**{filename}** deleted."},
     "re.col_dataset_format": {"id": "Format", "en": "Format"},
     "re.col_dataset_size": {"id": "Ukuran", "en": "Size"},
     "re.btn_pick_dataset": {"id": "Pilih", "en": "Select"},
@@ -349,7 +345,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.sec_download": {"id": "Unduh Laporan", "en": "Download Report"},
 
     # ── Dialog & sub-tampilan ────────────────────────────────────────────
-    "re.dlg_check_detail": {"id": "Rincian pemeriksaan", "en": "Check details"},
     "re.dlg_compat_test": {"id": "Uji Kompatibilitas Dataset",
                            "en": "Dataset Compatibility Test"},
     "re.dlg_pipeline_detail": {"id": "Detail Research Pipeline",
@@ -371,9 +366,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.phase_files_row": {"id": "{phase}: {files}", "en": "{phase}: {files}"},
     "re.phase_files_none": {"id": "belum ada berkas yang ditempatkan di sini",
                            "en": "no file placed here yet"},
-    "re.lbl_pick_dataset": {"id": "Pilih dataset", "en": "Choose dataset"},
-    "re.ph_pick_dataset": {"id": "Pilih berkas dataset…",
-                           "en": "Choose a dataset file…"},
+    "re.btn_change_dataset": {"id": "Ganti dataset", "en": "Change dataset"},
     "re.lbl_pick_pipeline": {"id": "Pilih research pipeline",
                              "en": "Choose research pipeline"},
     "re.ph_pick_pipeline": {"id": "Pilih research pipeline…",
@@ -960,8 +953,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "ap.msg_need_reject_reason": {
         "id": "Isi alasan penolakan pada Catatan tinjauan dulu.",
         "en": "Enter the reason for rejection in the Review note first."},
-    "ap.msg_not_compatible_yet": {"id": "Belum cocok dengan research pipeline mana pun, tetapi tetap boleh disimpan.",
-                                  "en": "Not compatible with any research pipeline yet, but it can still be saved."},
     "ap.msg_versions_unreadable": {
         "id": "Berkas kedua versi tidak terbaca: tidak ada yang dapat dibandingkan.",
         "en": "Neither version's files could be read: there is nothing to compare."},
@@ -1319,30 +1310,11 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Perenderan hasil diagnosa ────────────────────────────────────────
-    "dx.skipped_one": {
-        "id": "Dilewati. {reason}",
-        "en": "Skipped. {reason}"},
-    "dx.skipped_others": {
-        "id": "{names} dilewati. {reason}",
-        "en": "{names} skipped. {reason}"},
     # Daftar algoritma dibuat SEBARIS, bukan butir bertumpuk: empat butir
     # setinggi empat baris mendorong rincian pemeriksaan keluar layar,
     # padahal isinya cuma empat nama.
-    "dx.algorithms_inline": {
-        "id": "**Algoritma tersedia:** {names}",
-        "en": "**Algorithms available:** {names}"},
     # Catatan penutup. Dahulu dua kalimat yang mengatakan hal yang sama dua
     # kali, yaitu bahwa berkas tidak dimuat seluruhnya.
-    "dx.footer_note": {
-        "id": "Uji ini hanya membaca isi file dan tidak menjalankan pipeline "
-              "apa pun.",
-        "en": "This check only reads the file and does not run any "
-              "pipeline."},
-    "dx.footer_sampled": {
-        "id": "Diperiksa dari **{rows} baris pertama**.",
-        "en": "Checked from the **first {rows} rows**."},
-    "dx.unit_column": {"id": "kolom", "en": "columns"},
-    "dx.unit_json_key": {"id": "kunci JSON", "en": "JSON keys"},
 
 
     # ── Kolom KETERANGAN pada ekspor CSV  (Tahap 3A) ─────────────────────
@@ -1381,11 +1353,6 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Sisa teks tertanam yang dipindahkan  (Tahap 3A) ──────────────────
-    "ap.msg_no_match_anywhere": {
-        "id": "Belum cocok dengan research pipeline mana pun. Penyebab dan "
-              "langkah perbaikannya per pipeline ada di bawah.",
-        "en": "Not compatible with any research pipeline yet. The cause and "
-              "the fix for each pipeline are listed below."},
 
 
     # Header kolom tabel "Pengajuan saya".
@@ -1773,11 +1740,6 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Run Experiment: sisa teks tertanam  (Tahap 4A) ───────────────────
-    "re.help_pick_dataset": {
-        "id": "Pilih satu berkas untuk melihat preview, hasil validasi, dan "
-              "pipeline yang kompatibel.",
-        "en": "Choose one file to see its preview, validation result, and "
-              "compatible pipelines."},
 
 
     # ── Run Experiment: sisa teks tertanam, lanjutan  (Tahap 4A) ─────────

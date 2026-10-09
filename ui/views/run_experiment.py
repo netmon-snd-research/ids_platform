@@ -9,9 +9,6 @@ from pathlib import Path
 import streamlit as st
 
 from ui.i18n import t
-from ui.components.validator_messages import (
-    diagnostic_message, diagnostic_title,
-)
 
 logger = logging.getLogger(__name__)
 import pandas as pd
@@ -54,7 +51,7 @@ from contracts.dataset_schemas import get_schema
 # Helper murni untuk penyajian diagnosa (aturan format per dataset_type +
 # pembersih nilai mentah). `diagnose_all` sendiri tetap diimpor secara lazy di
 # dalam fungsi ber-cache.
-from orchestrator.dataset_diagnostics import required_format, sanitize_display_value
+from orchestrator.dataset_diagnostics import required_format
 
 # Accent color shared with the sidebar (kept in sync intentionally).
 
@@ -1314,9 +1311,11 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
                       "deletable": can_delete(user, nama_berkas, catatan)}
     baris = dataset_rows(options, sizes, mtimes, meta)
 
+    # Toast, bukan kotak: kotak hijau bertahan sampai halaman dimuat ulang,
+    # padahal pesannya hanya relevan sesaat.
     pesan = st.session_state.pop(_DS_FLASH_KEY, "")
     if pesan:
-        st.success(pesan)
+        st.toast(pesan, icon="✅", duration=5)
 
     if username:
         cari, saring = st.columns([3, 2])
@@ -1415,9 +1414,10 @@ def _render_delete_confirm(row: dict, user: dict | None) -> None:
     teks = t("re.ds_delete_confirm", filename=row["name"])
     if dipakai:
         teks += " " + t("re.ds_delete_used", count=dipakai)
-    st.warning(teks)
-    tombol = st.columns([1, 1, 3])
-    if tombol[0].button(t("re.btn_delete_dataset"), type="primary",
+    # Satu baris: pertanyaan di kiri, dua tombol di kanan.
+    tombol = st.columns([6, 2, 2], vertical_alignment="center")
+    tombol[0].markdown(teks)
+    if tombol[1].button(t("re.btn_confirm_delete"), type="primary",
                         key=f"ds_del_yes_{row['path']}",
                         use_container_width=True):
         try:
@@ -1434,13 +1434,15 @@ def _render_delete_confirm(row: dict, user: dict | None) -> None:
                                             filename=row["name"])
         invalidate_dataset_options()
         st.rerun()
-    if tombol[1].button(t("action.cancel"), key=f"ds_del_no_{row['path']}",
+    if tombol[2].button(t("action.cancel"), key=f"ds_del_no_{row['path']}",
                         use_container_width=True):
         st.session_state.pop(_DS_DELETE_KEY, None)
         st.rerun()
 
 
 PENDING_DATASET_KEY = "dataset_pick_pending"
+#: Kunci sesi dataset terpilih. Dahulu kunci widget dropdown; kini kunci biasa.
+DATASET_SELECT_KEY = "dataset_select"
 
 
 def _apply_pending_dataset(paths) -> None:
@@ -1453,7 +1455,7 @@ def _apply_pending_dataset(paths) -> None:
     """
     pending = st.session_state.pop(PENDING_DATASET_KEY, None)
     if pending is not None and pending in (paths or []):
-        st.session_state["dataset_select"] = pending
+        st.session_state[DATASET_SELECT_KEY] = pending
 
 
 def dataset_rows(options, sizes, mtimes=None, meta=None) -> list[dict]:
@@ -1782,107 +1784,15 @@ def _action_sentence(dataset_type: str, result: dict) -> str:
     return f"**Agar cocok:** {hint}" if hint else ""
 
 
-def _sample_note(diag: dict) -> str:
-    """Catatan bahwa angka berasal dari CUPLIKAN — dan hanya bila memang begitu.
-
-    Kebalikannya ("Berdasarkan seluruh N baris berkas ini") dicabut: ia cuma
-    menegaskan keadaan normal. Tanpa catatan, angkanya memang angka berkas itu.
-    Aturan yang SAMA dengan `_sample_note` di halaman Tambah Pipeline &
-    Dataset, supaya satu kalimat tidak hidup di satu tempat dan mati di tempat
-    lain — modal ini terbuka DARI halaman itu.
-    """
-    if not diag.get("rows_read") or not diag.get("sampled"):
-        return ""
-    return t("dx.footer_sampled", rows=f"{diag['rows_read']:,}")
-
-
 # ── Penyaji BERSAMA untuk "kolom/kunci yang hilang" ───────────────────────
 # Dipakai di DUA tempat — rincian dialog uji kecocokan dan ringkasan validasi
 # di halaman — supaya gayanya persis sama: JUMLAH dulu, beberapa contoh, lalu
 # "… (+N lainnya)". Daftar penuh 80+ kolom tidak pernah tampil secara default.
 
-# Maksimal nama yang disebut sebelum "… (+N lainnya)". Disamakan dengan
-# _MAX_LISTED di orchestrator/dataset_diagnostics.py agar jumlah contoh di
-# rincian dialog dan di ringkasan validasi persis sama.
-_MISSING_PREVIEW = 5
-
 # Baris error validator yang isinya dump daftar mentah — diganti oleh penyaji
 # ini, jadi tidak pernah ditampilkan apa adanya. (Sumber literalnya:
 # orchestrator/validator.py; hanya dicocokkan, tidak diubah.)
 _RAW_LIST_ERROR_PREFIXES = ("Missing required columns", "Missing expected JSON keys")
-
-
-def _missing_items_summary(count: int, examples: list[str], dataset_type: str,
-                           *, unit: str = "kolom") -> str:
-    """Satu kalimat: jumlah + contoh terbatas. TIDAK pernah mendaftar semuanya."""
-    shown = [sanitize_display_value(e) for e in examples[:_MISSING_PREVIEW]]
-    text = (f"Dataset ini kekurangan **{count} {unit}** yang diminta skema "
-            f"`{dataset_type}`.")
-    if shown:
-        rest = count - len(shown)
-        contoh = ", ".join(f"`{n}`" for n in shown)
-        text += f" Contoh: {contoh}"
-        text += f", … (+{rest} lainnya)." if rest > 0 else "."
-    return text
-
-
-def _render_check_list(result: dict, dataset_type: str = "") -> None:
-    """Rincian kelima pemeriksaan. Status `skip` ditandai jelas sebagai
-    *dilewati* agar tidak terbaca seperti kegagalan."""
-    checks = result.get("checks", [])
-
-    # Cek yang dilewati dengan ALASAN yang sama (mis. keempatnya menunggu format
-    # berkas benar) diruntuhkan jadi SATU baris — empat kalimat identik tidak
-    # menambah informasi apa pun. Skip yang berdiri sendiri (mis. "tidak berlaku
-    # untuk pipeline ini") tetap punya barisnya sendiri.
-    # Dikelompokkan menurut KUNCI pesan, bukan kalimatnya: kalimat berubah
-    # mengikuti bahasa, kunci tidak. Mengelompokkan berdasarkan teks akan
-    # berhenti meruntuhkan begitu bahasanya berganti.
-    skip_groups: dict[str, list[str]] = {}
-    for c in checks:
-        if c["status"] == "skip":
-            group_id = c.get("msg_key") or c["message"]
-            skip_groups.setdefault(group_id, []).append(diagnostic_title(c))
-    collapsed_shown: set[str] = set()
-
-    for c in checks:
-        icon = _STATUS_ICON.get(c["status"], "·")
-        title = diagnostic_title(c)
-        message = diagnostic_message(c)
-        if c["status"] == "skip":
-            group_id = c.get("msg_key") or c["message"]
-            group = skip_groups.get(group_id, [])
-            if len(group) > 1:
-                if group_id in collapsed_shown:
-                    continue
-                collapsed_shown.add(group_id)
-                names = ", ".join(group)
-                st.markdown(
-                    f"- {icon} _"
-                    + t("dx.skipped_others", names=names,
-                        reason=sanitize_display_value(message)) + "_"
-                )
-            else:
-                st.markdown(f"- {icon} **{title}** · _"
-                            + t("dx.skipped_one",
-                                reason=sanitize_display_value(message)) + "_")
-            continue
-
-        # Kolom/kunci yang hilang memakai penyaji BERSAMA (jumlah + contoh
-        # terbatas), gaya yang sama dengan ringkasan validasi dataset.
-        if c["key"] == "features" and c["status"] == "fail" and c.get("count"):
-            # Satuannya ditentukan dari KUNCI pesan, bukan dari isi kalimat:
-            # mencari "kunci JSON" di dalam teks akan gagal diam-diam begitu
-            # kalimatnya berbahasa Inggris.
-            unit = (t("dx.unit_json_key")
-                    if c.get("msg_key") == "dx.eve_keys_missing"
-                    else t("dx.unit_column"))
-            st.markdown(f"- {icon} **{title}** · "
-                        + _missing_items_summary(c["count"], c.get("examples") or [],
-                                                 dataset_type, unit=unit))
-            continue
-
-        st.markdown(f"- {icon} **{title}** · {message}")
 
 
 def _render_validation_failure(v: dict, dataset_type: str, *,
@@ -1945,78 +1855,37 @@ def _any_compatible(diag: dict) -> bool:
     return bool(diag.get("compatible_types"))
 
 
+#: Warna label verdict di dialog. Teks berwarna, bukan kotak: kotak merah,
+#: kuning, atau hijau di sekeliling satu kalimat lebih berat daripada isinya.
+_VERDICT_COLOR = {VERDICT_OK: "green", VERDICT_NEAR: "orange", VERDICT_NO: "red"}
+
+
 def _compat_dialog_body(diag: dict, dataset_type: str, *,
-                        collapsible: bool = True,
-                        algorithms: list[str] | None = None) -> None:
-    """Isi hasil uji kecocokan untuk SATU research pipeline.
+                        collapsible: bool = True) -> None:
+    """Hasil uji kompatibilitas untuk SATU research pipeline. Ringkas.
 
-    Tiga lapis: verdict → penyebab utama (satu kalimat) → tindakan, dengan
-    kelima pemeriksaan dilipat di "Rincian pemeriksaan". Hanya membaca hasil
-    diagnosa ber-cache — tidak ada pipeline/model yang dijalankan dan tidak ada
-    pembacaan berkas baru di sini.
+    Tiga baris: judul research, verdict dengan sebab utamanya, dan tindakan
+    "Agar cocok". Penulis ada di katalog, daftar algoritma di pemilih
+    algoritma; di sini keduanya hanya memanjangkan dialog. Hanya membaca hasil
+    diagnosa ber-cache; tidak ada pipeline yang dijalankan.
 
-    ``collapsible=False`` dipakai pada jalur cadangan (Streamlit tanpa
-    ``st.dialog``), karena isinya sudah berada di dalam sebuah expander dan
-    Streamlit melarang expander bersarang.
-
-    ``algorithms`` OPSIONAL. Halaman ini TIDAK mengirimnya — pemilih
-    algoritmanya berdiri di halaman itu sendiri, jadi menyebutkannya di modal
-    hanya akan mengatakan dua kali. Halaman Tambah Pipeline & Dataset
-    mengirimnya, karena di sana tidak ada pemilih apa pun: daftar itu dahulu
-    tergambar sebagai butir-butir di kartu, dan kartunya diganti tabel.
+    ``collapsible=False`` adalah jalur cadangan tanpa ``st.dialog`` (isinya
+    dalam expander, tanpa tombol ✕), jadi tombol Tutup hanya ada di sana.
     """
     result = (diag.get("results") or {}).get(dataset_type) or {}
-
-    # Judul TEBAL, daftar penulis kecil di bawahnya. Sebelumnya keduanya satu
-    # baris tebal, sehingga tujuh nama penulis mendominasi puncak modal dan
-    # nama research-nya sendiri terdorong ke ujung baris kedua. Pemecahnya
-    # dipakai ulang dari katalog, bukan ditebak dari tanda baca di sini.
-    from ui.components.pipeline_catalog import split_credit
-
-    nama, kredit = split_credit(get_research_display_name(dataset_type))
-    st.markdown(f"**{nama}**  ·  `{dataset_type}`")
-    if kredit:
-        st.caption(kredit)
+    st.markdown(f"**{get_research_title(dataset_type)}**")
 
     if not result:
-        st.warning(diag.get("error") or "Hasil diagnosa tidak tersedia.")
+        st.markdown(diag.get("error") or "Hasil diagnosa tidak tersedia.")
     else:
         verdict = _verdict(result)
-        headline = (f"**{_VERDICT_LABEL[verdict]}** · "
-                    f"{_cause_sentence(diag, dataset_type, result)}")
-        if verdict == VERDICT_OK:
-            st.success(headline)
-        elif verdict == VERDICT_NEAR:
-            st.warning(headline)
-        else:
-            st.error(headline)
-
+        st.markdown(f":{_VERDICT_COLOR[verdict]}[**{_VERDICT_LABEL[verdict]}**]"
+                    f" · {_cause_sentence(diag, dataset_type, result)}")
         action = _action_sentence(dataset_type, result)
         if action:
             st.markdown(action)
 
-        # Kecocokan ditentukan `dataset_type`; algoritma adalah pilihan DI
-        # DALAM research pipeline yang sama — bukan pemeriksaan terpisah.
-        if algorithms:
-            st.markdown(t("dx.algorithms_inline",
-                          names=", ".join(algorithms)))
-
-        if collapsible:
-            with st.expander(t("re.dlg_check_detail"), expanded=False):
-                _render_check_list(result, dataset_type)
-        else:
-            st.markdown("**Rincian pemeriksaan**")
-            _render_check_list(result, dataset_type)
-
-        # SATU baris penutup. Dahulu dua kalimat yang mengatakan hal yang
-        # sama dua kali: "berkas tidak dimuat seluruhnya" lalu "tidak memuat
-        # seluruh dataset". Yang tersisa hanya dua fakta yang berbeda, yaitu
-        # dari berapa baris angkanya berasal dan bahwa tidak ada pipeline yang
-        # dijalankan.
-        note = _sample_note(diag)
-        st.caption((f"{note} " if note else "") + t("dx.footer_note"))
-
-    if st.button("Tutup", key=f"compat_close_{dataset_type}"):
+    if not collapsible and st.button("Tutup", key=f"compat_close_{dataset_type}"):
         _close_compat_dialog()
 
 
@@ -2099,7 +1968,8 @@ def _render_compat_boxes(diag: dict) -> None:
         st.warning(diag.get("error") or "Diagnosa kecocokan tidak tersedia.")
         return
 
-    st.warning(t("re.msg_no_auto_match"))
+    # Teks biasa, bukan kotak peringatan: daftar di bawahnya yang menuntun.
+    st.markdown(t("re.msg_no_auto_match"))
     try:
         katalog = {r["dataset_type"]: r for r in catalog_rows()}
     except Exception:                       # pragma: no cover - defensif
@@ -2562,7 +2432,7 @@ def _use_dataset(dataset_type: str, path: str) -> None:
     tampilan itu tidak perlu tahu pilihan ini datang dari katalog. Algoritma
     sengaja tidak ikut dipilih — itu tetap keputusan pengguna di sana.
     """
-    st.session_state["dataset_select"] = path
+    st.session_state[DATASET_SELECT_KEY] = path
     st.session_state["research_select"] = dataset_type
     close_catalog_run()
     go_to_execute()
@@ -2934,23 +2804,30 @@ def _render_execute():
 
     _sizes = _dataset_sizes()
 
-    def _ds_label(p: str) -> str:
-        raw = _sizes.get(p, -1)
-        size = format_size(raw) if raw >= 0 else "ukuran tidak diketahui"
-        return f"{Path(p).name}  ({size})"
-
-    # Kontrol mengisi LEBAR PENUH kolomnya; ringkasannya menyusul di bawah.
-    # Label disembunyikan, bukan dikosongkan: placeholder "Pilih dataset…" di
-    # dalam kontrolnya sudah mengatakan hal yang sama, jadi labelnya hanya
-    # mengulang satu baris di atasnya. Namanya tetap ada untuk pembaca layar.
+    # TANPA dropdown: tabel di bawah sudah memuat setiap dataset beserta
+    # tombol Pilih-nya, jadi dropdown hanya mengulang daftar yang sama.
+    # Pilihannya disimpan di kunci sesi biasa `dataset_select`, yang juga
+    # diisi katalog (`_use_dataset`). Pilihan yang sudah tidak ada di daftar
+    # (dihapus, atau kini privat milik orang lain) dibuang.
     _apply_pending_dataset(_paths)
+    dataset_path = st.session_state.get(DATASET_SELECT_KEY)
+    if dataset_path not in _paths:
+        st.session_state.pop(DATASET_SELECT_KEY, None)
+        dataset_path = None
 
-    dataset_path = st.selectbox(
-        t("re.lbl_pick_dataset"), _paths, index=None,
-        placeholder=t("re.ph_pick_dataset"),
-        format_func=_ds_label, key="dataset_select",
-        help=t("re.help_pick_dataset"), label_visibility="collapsed",
-    )
+    if dataset_path:
+        # Dataset terpilih tampil sebagai satu baris ringkas, dengan jalan
+        # kembali ke tabel.
+        import html
+
+        raw = _sizes.get(dataset_path, -1)
+        ukuran = format_size(raw) if raw >= 0 else "-"
+        kiri, kanan = st.columns([5, 1], vertical_alignment="center")
+        kiri.markdown(f"**{html.escape(Path(dataset_path).name)}** · {ukuran}")
+        if kanan.button(t("re.btn_change_dataset"), key="ds_change",
+                        use_container_width=True):
+            st.session_state.pop(DATASET_SELECT_KEY, None)
+            st.rerun()
 
     if not dataset_path:
         # Belum ada berkas terpilih: DAFTARNYA, bukan sekadar jumlahnya.
