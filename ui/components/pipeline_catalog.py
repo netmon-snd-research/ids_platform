@@ -1290,36 +1290,41 @@ def _render_search_and_filters(catalog):
     if chosen_category:
         current = set(selected.get(chosen_category) or ())
         entry = next(c for c in categories if c["key"] == chosen_category)
-        boxes = st.columns(min(4, len(entry["values"])) or 1)
-        picked = set()
-        for i, (value, count) in enumerate(entry["values"]):
-            label = f"{value_label(value)} ({count})"
-            if boxes[i % len(boxes)].checkbox(
-                    label, value=value in current,
-                    key=f"_cat_v_{chosen_category}_{value}",
-                    help=value if value != UNSPECIFIED else None):
-                picked.add(value)
-        selected[chosen_category] = sorted(picked)
+        jumlah = dict(entry["values"])
+        nilai = [v for v, _ in entry["values"]]
+        # PIL multi-pilih, bukan kotak centang dalam kisi empat kolom: fungsi
+        # yang sama (pilih beberapa, lepas dengan klik ulang) dalam satu atau
+        # dua baris rapat. Kuncinya per kategori, jadi pilihan di kategori
+        # lain tetap tersimpan saat kategori berganti.
+        picked = st.pills(
+            entry["label"], nilai, selection_mode="multi",
+            default=[v for v in nilai if v in current],
+            format_func=lambda v: f"{value_label(v)} · {jumlah[v]}",
+            key=f"_cat_pills_{chosen_category}",
+            label_visibility="collapsed")
+        selected[chosen_category] = sorted(picked or ())
         st.session_state[_SELECTED_KEY] = {k: v for k, v in selected.items() if v}
         selected = _selected_filters()
 
     visible = apply_filters(filter_catalog(catalog, query), selected)
 
-    active = active_filter_text(selected)
-    if active:
-        line, clear = st.columns([5, 1])
-        line.markdown(t("re.cat_active_filters", filters=active))
-        if clear.button(t("re.cat_clear_filters"), key="_cat_clear",
-                        use_container_width=True):
+    # SATU baris kecil: berapa yang tampil, penyaring apa yang aktif (juga
+    # dari kategori yang sedang tidak dibuka), dan Bersihkan. Penyaring tidak
+    # boleh memendekkan daftar tanpa disadari, tetapi menyatakannya tidak
+    # perlu dua baris dan sebuah tombol selebar kolom.
+    if query or selected:
+        teks = t("re.cat_shown", shown=len(visible), total=len(catalog))
+        active = active_filter_text(selected)
+        if active:
+            teks += " · " + t("re.cat_active_filters", filters=active)
+        line, clear = st.columns([6, 1], vertical_alignment="center")
+        line.caption(teks)
+        if selected and clear.button(t("re.cat_clear_filters"), key="_cat_clear",
+                                     type="tertiary", use_container_width=True):
             for key in list(st.session_state):
                 if str(key).startswith("_cat_"):
                     del st.session_state[key]
             st.rerun()
-
-    # Jumlah hasil SELALU dinyatakan: penyaring tidak boleh memendekkan daftar
-    # tanpa disadari.
-    if query or selected:
-        st.caption(t("re.cat_shown", shown=len(visible), total=len(catalog)))
     if not visible and (query or selected):
         from ui.components.sections import prose
 
