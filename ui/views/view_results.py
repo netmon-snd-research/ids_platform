@@ -891,6 +891,7 @@ def _dash_health(nonce: int) -> dict:
 #: Jeda penyegaran daftar Sedang Berjalan, dalam detik.
 _DASH_INTERVAL = 6
 _DASH_RUNNING_IDS = "_dash_running_ids"
+_DASH_AUTO = "_dash_auto_on"
 
 
 def _render_running_head() -> bool:
@@ -899,21 +900,30 @@ def _render_running_head() -> bool:
     Di LUAR fragmen: mengubah Auto-refresh menggambar ulang halaman, dan
     hanya dengan begitu jeda penyegaran fragmennya dapat berubah.
     """
-    # Penanda `.ids-dash-head`: di layar sempit judul tetap satu baris penuh,
-    # tetapi Auto-refresh dan Perbarui berdampingan alih-alih dua baris.
+    # Judul dengan dua IKON kecil di sampingnya, bukan sakelar berlabel dan
+    # tombol selebar kolom: keduanya kendali sekunder, dan menulisnya sebagai
+    # teks penuh membuat kepala bagian ini lebih lebar daripada isinya.
+    if _DASH_AUTO not in st.session_state:
+        st.session_state[_DASH_AUTO] = True
+    auto = bool(st.session_state[_DASH_AUTO])
+    # Penanda `.ids-dash-head`: di layar sempit kedua ikon tetap berbagi satu
+    # baris di bawah judul, tidak menumpuk satu per baris.
     head_box = st.container()
     head_box.markdown('<span class="ids-dash-head"></span>', unsafe_allow_html=True)
     with head_box:
-        head = st.columns([3, 1, 1])
-    head[0].subheader(t("ps.running_title"))
-    if hasattr(head[1], "toggle"):
-        auto = head[1].toggle("Auto-refresh", value=True, key="_dash_auto")
-    else:
-        auto = head[1].checkbox("Auto-refresh", value=True, key="_dash_auto")
-    if head[2].button(t("ps.btn_refresh_now"), use_container_width=True, key="_dash_refresh"):
+        judul, ikon_auto, ikon_segar = st.columns([20, 1, 1],
+                                                  vertical_alignment="center")
+    judul.subheader(t("ps.running_title"))
+    if ikon_auto.button(":material/sync:" if auto else ":material/sync_disabled:",
+                        key="_dash_auto_btn", type="tertiary",
+                        help=t("ps.help_auto_on" if auto else "ps.help_auto_off")):
+        st.session_state[_DASH_AUTO] = not auto
+        st.rerun()
+    if ikon_segar.button(":material/refresh:", key="_dash_refresh",
+                         type="tertiary", help=t("ps.btn_refresh_now")):
         st.session_state["_dash_nonce"] = st.session_state.get("_dash_nonce", 0) + 1
         st.rerun()
-    return bool(auto)
+    return auto
 
 
 def _render_running_live() -> None:
@@ -947,7 +957,7 @@ def _render_running_section(experiments) -> list:
     running = select_running(experiments)
 
     if not running:
-        st.info(t("ps.empty_running"))
+        st.caption(t("ps.empty_running"))
         return running
 
     health = _dash_health(st.session_state.get("_dash_nonce", 0))

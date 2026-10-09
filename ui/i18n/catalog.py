@@ -178,11 +178,12 @@ CATALOG: dict[str, dict[str, str]] = {
                          "en": "Compare selected ({count})"},
 
     # ── Keadaan kosong ───────────────────────────────────────────────────
-    "ps.empty_running": {
-        "id": "Tidak ada eksperimen yang sedang berjalan. Buka "
-              "**Run Experiment** dari menu di sidebar untuk memulai.",
-        "en": "No experiments are running. Open **Run Experiment** from the "
-              "sidebar menu to start one."},
+    "ps.empty_running": {"id": "Tidak ada eksperimen yang sedang berjalan.",
+                         "en": "No experiments are running."},
+    "ps.help_auto_on": {"id": "Auto-refresh aktif. Klik untuk menjeda.",
+                        "en": "Auto-refresh is on. Click to pause."},
+    "ps.help_auto_off": {"id": "Auto-refresh dijeda. Klik untuk melanjutkan.",
+                         "en": "Auto-refresh is paused. Click to resume."},
     "ps.empty_history": {
         "id": "Belum ada eksperimen. Buka halaman 'Run Experiment' untuk "
               "membuat satu.",
