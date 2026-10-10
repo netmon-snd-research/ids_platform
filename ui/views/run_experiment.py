@@ -2054,9 +2054,10 @@ def _maybe_render_compat_dialog(diag: dict) -> None:
 
 #: Kolom daftar uji kompatibilitas. Sama dengan daftar Kelola Research, dengan
 #: satu tombol di kanan sebagai pengganti kolom status dan aksi pengelolaan.
+# Tanpa kolom jumlah algoritma: daftar ini hanya untuk memilih research yang
+# hendak diuji kecocokannya, dan jumlah algoritmanya tidak membantu memilih.
 _CX_COLS = (
-    ("rs.col_pipeline", 14),
-    ("rs.col_algorithms", 4),
+    ("rs.col_pipeline", 18),
     ("", 6),
 )
 _CX_QUERY_KEY = "_cx_query"
@@ -2075,7 +2076,6 @@ def _render_compat_boxes(diag: dict) -> None:
     from ui.components.research_manage import (
         catalog_rows, credit_line, filter_rows,
     )
-    from ui.components.sections import mobile_card_labels
 
     results = diag.get("results") or {}
     if not results:
@@ -2105,7 +2105,6 @@ def _render_compat_boxes(diag: dict) -> None:
         return
 
     lebar = [b for _, b in _CX_COLS]
-    mobile_card_labels("ids-cx-row", {2: t("rs.col_algorithms")})
     with st.container():
         st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
@@ -2126,10 +2125,9 @@ def _render_compat_boxes(diag: dict) -> None:
                 + (f'<span class="ids-row-sub">{html.escape(sub)}</span>'
                    if sub else ""),
                 unsafe_allow_html=True)
-            sel[1].markdown(str(row.get("algorithms", 0)))
             # Hanya menyimpan pilihan. Dialognya dibuka dari alur utama
             # (`_maybe_render_compat_dialog`), sesudah daftar ini.
-            if sel[2].button(t("re.btn_compat_test"),
+            if sel[1].button(t("re.btn_compat_test"),
                              key=f"compat_test_{dtype}",
                              use_container_width=True):
                 _request_compat_check(dtype)
