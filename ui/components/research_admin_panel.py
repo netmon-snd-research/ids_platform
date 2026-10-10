@@ -48,11 +48,30 @@ logger = logging.getLogger(__name__)
 _CONFIRM_KEY = "_rs_confirm_delete"
 
 
-def algorithm_label(row: dict) -> str:
-    """Satu algoritma sebagaimana dibaca manusia: nama, versi, keadaannya."""
-    algo = (row.get("algorithm") or row.get("name") or "").strip() or "-"
-    state = t("rv.status_active") if row.get("active") else t("rv.status_inactive")
-    return f"{algo} · v{row.get('version')} · {state}"
+#: Kolom tabel algoritma: (kunci label i18n, bobot lebar). Bentuknya sama
+#: dengan tabel lain (`ids-queue-row`); kolom terakhir tanpa judul berisi
+#: empat tombol aksi.
+_ALGO_COLS = (
+    ("re.lbl_algorithm", 5),
+    ("re.col_version", 2),
+    ("rs.col_status", 3),
+    ("", 16),
+)
+
+
+def algorithm_name(row: dict) -> str:
+    return (row.get("algorithm") or row.get("name") or "").strip() or "-"
+
+
+def live_state(live: int, total: int) -> str:
+    """Rona ringkasan algoritma aktif: semua hijau, sebagian kuning, nol abu.
+
+    Sebagian aktif diberi kuning karena ia keadaan yang perlu diperhatikan:
+    sebagian algoritma research ini hilang dari pilihan orang lain.
+    """
+    if total and live >= total:
+        return "ok"
+    return "warn" if live else "off"
 
 
 def _is_builtin(dataset_type: str) -> bool:
@@ -100,9 +119,26 @@ def render(dataset_type: str, user: dict | None) -> None:
 
     live = sum(1 for r in rows if r.get("active"))
     _render_research_switch(dataset_type, rows, live, user)
-    st.markdown(t("re.lbl_algorithm_state", live=live, total=len(rows)))
+    _render_algorithm_head(live, len(rows))
     for row in rows:
         _render_algorithm(row, user)
+
+
+def _render_algorithm_head(live: int, total: int) -> None:
+    """Ringkasan berwarna jumlah algoritma aktif, lalu kepala tabelnya."""
+    st.markdown(grid.state_badge(t("re.lbl_algorithm_state", live=live,
+                                   total=total), live_state(live, total)),
+                unsafe_allow_html=True)
+    # Di layar sempit judul kolom disembunyikan; versi membawa labelnya
+    # sendiri, status tidak perlu karena pilnya terbaca sendiri.
+    mobile_card_labels("ids-q-algo", {2: t("re.col_version")})
+    with st.container():
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
+                    unsafe_allow_html=True)
+        kepala = st.columns([b for _, b in _ALGO_COLS],
+                            vertical_alignment="center")
+        for kol, (kunci, _) in zip(kepala, _ALGO_COLS):
+            kol.markdown(f"**{t(kunci)}**" if kunci else "")
 
 
 def _render_research_switch(dataset_type: str, rows: list[dict], live: int,
@@ -143,20 +179,47 @@ def _render_algorithm(row: dict, user: dict | None) -> None:
     from orchestrator.pipeline_versions import delete_blocker, delete_version
 
     pipeline_id = row["pipeline_id"]
-    cols = st.columns([4, 2, 2, 2, 2])
-    cols[0].markdown(algorithm_label(row))
-
     active = bool(row.get("active"))
     # Alasan tombol nonaktif SELALU dinyatakan — tombol mati tanpa keterangan
     # membuat pengguna menebak apa yang kurang.
     blocked = _safe(dr.last_active_algorithm_blocker, pipeline_id) if active else ""
-    with dark_button_scope(cols[1], dark=active, key=f"ra_{pipeline_id}"):
-        matikan = st.button(t("re.btn_algorithm_on" if not active
-                              else "re.btn_algorithm_off"),
-                            key=f"re_algo_toggle_{pipeline_id}",
-                            use_container_width=True,
-                            disabled=bool(blocked),
-                            help=t(blocked) if blocked else None)
+    stop = _safe(delete_blocker, pipeline_id)
+
+    # Satu baris berbingkai. Garis kirinya diwarnai menurut keadaan
+    # (`ids-algo-on` / `ids-algo-off` di theme.py), jadi algoritma yang mati
+    # terbedakan sekilas tanpa membaca pilnya.
+    with st.container(border=True):
+        st.markdown('<span class="ids-queue-row ids-mcard ids-q-algo '
+                    f'{"ids-algo-on" if active else "ids-algo-off"}"></span>',
+                    unsafe_allow_html=True)
+        sel = st.columns([b for _, b in _ALGO_COLS], vertical_alignment="center")
+        sel[0].markdown(f"**{escape(algorithm_name(row))}**")
+        sel[1].markdown(f"v{escape(str(row.get('version')))}")
+        sel[2].markdown(grid.state_badge(
+            t("rs.status_active" if active else "rs.status_inactive"),
+            "ok" if active else "off"), unsafe_allow_html=True)
+        aksi = sel[3].columns(4)
+        with dark_button_scope(aksi[0], dark=active, key=f"ra_{pipeline_id}"):
+            matikan = st.button(t("re.btn_algorithm_on" if not active
+                                  else "re.btn_algorithm_off"),
+                                key=f"re_algo_toggle_{pipeline_id}",
+                                use_container_width=True,
+                                disabled=bool(blocked),
+                                help=t(blocked) if blocked else None)
+        hapus = aksi[1].button(t("re.btn_delete_algorithm"),
+                               key=f"re_algo_delete_{pipeline_id}",
+                               use_container_width=True,
+                               disabled=bool(stop), help=t(stop) if stop else None)
+        # Dua aksi yang layanannya lengkap tetapi kehilangan pemicunya ketika
+        # halaman satu-pipeline dicabut: menyunting paket menjadi versi baru,
+        # dan meninjau ulang pengajuannya. Keduanya kembali DI SINI, di baris
+        # algoritma yang memang menjadi tempat aksi lain algoritma itu.
+        sunting = aksi[2].button(t("re.btn_edit_package"),
+                                 key=f"re_algo_edit_{pipeline_id}",
+                                 use_container_width=True,
+                                 help=t("re.help_edit_package"))
+        _render_reopen(row, user, aksi[3])
+
     if matikan:
         try:
             dr.set_pipeline_active(pipeline_id, not active, actor=user)
@@ -169,26 +232,13 @@ def _render_algorithm(row: dict, user: dict | None) -> None:
                          pipeline_id))
             st.rerun()
 
-    stop = _safe(delete_blocker, pipeline_id)
-    if cols[2].button(t("re.btn_delete_algorithm"),
-                      key=f"re_algo_delete_{pipeline_id}",
-                      use_container_width=True,
-                      disabled=bool(stop), help=t(stop) if stop else None):
+    if hapus:
         st.session_state[_CONFIRM_KEY] = pipeline_id
         st.rerun()
-
-    # Dua aksi yang layanannya lengkap tetapi kehilangan pemicunya ketika
-    # halaman satu-pipeline dicabut: menyunting paket menjadi versi baru, dan
-    # meninjau ulang pengajuannya. Keduanya kembali DI SINI, di baris algoritma
-    # yang memang menjadi tempat aksi lain algoritma itu.
-    if cols[3].button(t("re.btn_edit_package"),
-                      key=f"re_algo_edit_{pipeline_id}",
-                      use_container_width=True,
-                      help=t("re.help_edit_package")):
+    if sunting:
         st.session_state[_EDIT_KEY] = pipeline_id
         st.rerun()
 
-    _render_reopen(row, user, cols[4])
     _render_info_refresh(row, user)
 
     # Urutannya mengikuti urutan pekerjaannya: menyunting paket, lalu menguji

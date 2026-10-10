@@ -443,6 +443,21 @@ div[data-testid="stVerticalBlock"] > .stElementContainer:has(.ids-queue-head) {{
     display: none;
 }}
 
+/* Baris algoritma pada panel "Kelola research pipeline ini": garis kiri
+   menurut keadaannya, sewarna dengan pil Aktif/Tidak aktif di baris yang
+   sama. Yang tidak aktif ikut diredupkan namanya, sehingga daftar yang
+   sebagian mati terbaca sekilas tanpa membaca pilnya satu per satu. */
+div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-algo-on) {{
+    border-left: .25rem solid rgba(46,160,67,.75);
+}}
+div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-algo-off) {{
+    border-left: .25rem solid rgba(127,127,127,.45);
+}}
+div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-algo-off)
+    [data-testid="stMarkdownContainer"] strong {{
+    opacity: .6;
+}}
+
 /* ── Kotak sunting skrip: chrome editor ────────────────────────────────
    `st.text_area` mengembalikan teks biasa kepada Python, dan justru itulah
    yang membuatnya dapat digerakkan test. Warna tokennya dibawa penyorot
