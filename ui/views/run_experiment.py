@@ -1295,10 +1295,18 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
     user = _viewer()
     username = (user or {}).get("username")
     catatan = all_rows()
+    terikat = _bound_dataset_owners()
     meta = {}
     for path, _dtype in options or []:
         nama_berkas = registry_name(path)
         if nama_berkas is None:
+            # Di luar `storage/datasets/`: dataset yang terikat ke research
+            # kontribusi. Modul dataset tidak mengaturnya, jadi ia tidak dapat
+            # dihapus dari sini, dan sebabnya dikatakan alih-alih tombolnya
+            # hilang tanpa keterangan.
+            research = terikat.get(_resolved(path))
+            if research:
+                meta[path] = {"bound_to": research}
             continue
         m = info(nama_berkas, catatan)
         meta[path] = {"owner": m["owner"],
@@ -1352,7 +1360,9 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
                 # bila bukan penontonnya sendiri (Research Admin melihat
                 # dataset privat semua orang).
                 sub = ""
-                if row.get("private"):
+                if row.get("bound_to"):
+                    sub = t("re.ds_bound_to", research=row["bound_to"])
+                elif row.get("private"):
                     pemilik = row.get("owner")
                     sub = (t("re.ds_private_of", owner=pemilik)
                            if pemilik and pemilik != username
@@ -1374,6 +1384,15 @@ def _render_dataset_table(options, sizes, mtimes=None) -> None:
                         use_container_width=True):
                     st.session_state[_DS_DELETE_KEY] = row["path"]
                     st.rerun()
+                elif row.get("bound_to") and _is_admin(user):
+                    # Tombolnya tetap tampak bagi yang biasanya boleh
+                    # menghapus, tetapi mati beserta alasannya: baris yang
+                    # tombolnya hilang terbaca seperti izin yang dicabut.
+                    aksi[1].button(t("re.btn_delete_dataset"),
+                                   key=f"ds_del_{row['path']}",
+                                   use_container_width=True, disabled=True,
+                                   help=t("re.ds_bound_no_delete",
+                                          research=row["bound_to"]))
                 if aksi[0].button(t("re.btn_pick_dataset"),
                                   key=f"ds_pick_{row['path']}",
                                   use_container_width=True):
@@ -1471,6 +1490,35 @@ def _apply_pending_dataset(paths) -> None:
         st.session_state[DATASET_SELECT_KEY] = sama[0]
 
 
+def _is_admin(user) -> bool:
+    from orchestrator.auth_service import is_account_active, is_research_admin
+    return is_account_active(user) and is_research_admin(user)
+
+
+def _resolved(path) -> str:
+    try:
+        return str(Path(path).resolve())
+    except OSError:                          # pragma: no cover - defensif
+        return str(path)
+
+
+def _bound_dataset_owners() -> dict[str, str]:
+    """``{path berkas: judul research}`` untuk dataset yang terikat ke research
+    kontribusi. Kegagalan membaca menghasilkan peta kosong, bukan halaman jatuh.
+    """
+    try:
+        from orchestrator.research_registry import dataset_files_for, list_research
+        keluar = {}
+        for row in list_research(active_only=False):
+            dtype = row.get("dataset_type")
+            for path in dataset_files_for(dtype):
+                keluar[_resolved(path)] = get_research_title(dtype) or dtype
+        return keluar
+    except Exception:                        # pragma: no cover - defensif
+        logger.debug("Dataset terikat research tidak terbaca", exc_info=True)
+        return {}
+
+
 def dataset_rows(options, sizes, mtimes=None, meta=None) -> list[dict]:
     """Baris tabel dataset, TERBARU di atas. MURNI: tanpa Streamlit dan disk.
 
@@ -1512,6 +1560,7 @@ def dataset_rows(options, sizes, mtimes=None, meta=None) -> list[dict]:
             "owner": (meta or {}).get(path, {}).get("owner"),
             "private": bool((meta or {}).get(path, {}).get("private")),
             "deletable": bool((meta or {}).get(path, {}).get("deletable")),
+            "bound_to": (meta or {}).get(path, {}).get("bound_to") or "",
         })
     keluar.sort(key=lambda r: (r["mtime"] is None, -(r["mtime"] or 0),
                                r["name"].lower()))
@@ -1591,13 +1640,35 @@ def _dataset_preview(path: str, dataset_type: str, n: int = 5):
 
 # ── Diagnosa kecocokan dataset (otomatis, hemat memori) ───────────────────
 
+def _research_signature() -> str:
+    """Sidik daftar research pipeline beserta skemanya, untuk kunci cache.
+
+    Diagnosa tidak hanya bergantung pada berkasnya, tetapi juga pada research
+    apa saja yang ada. Tanpa ini, research yang baru disetujui (atau skema
+    yang baru disunting) tidak pernah muncul untuk dataset yang sudah pernah
+    didiagnosa, sampai proses aplikasi dimulai ulang.
+    """
+    import json
+
+    try:
+        from orchestrator.research_registry import all_dataset_types, schema_for
+        return json.dumps([(d, schema_for(d)) for d in all_dataset_types()],
+                          sort_keys=True, default=str)
+    except Exception:                       # pragma: no cover - defensif
+        logger.debug("Daftar research tidak terbaca untuk kunci cache",
+                     exc_info=True)
+        return ""
+
+
 @st.cache_data(show_spinner=False)
-def _cached_diagnosis(dataset_path: str, mtime: float, size: int) -> dict:
+def _cached_diagnosis(dataset_path: str, mtime: float, size: int,
+                      research_sig: str = "") -> dict:
     """Diagnosa kecocokan berkas terhadap SEMUA research pipeline.
 
-    Kunci cache = (path, mtime, ukuran) → diagnosa hanya dihitung ulang bila
-    berkas yang dipilih berganti atau berubah di disk; rerun Streamlit biasa
-    memakai hasil cache dan TIDAK menyentuh berkas sama sekali.
+    Kunci cache = (path, mtime, ukuran, sidik research) → diagnosa hanya
+    dihitung ulang bila berkas yang dipilih berganti atau berubah di disk,
+    atau daftar research berubah; rerun Streamlit biasa memakai hasil cache
+    dan TIDAK menyentuh berkas sama sekali.
 
     Berkas dibaca SATU KALI dan dicuplik (lihat SAMPLE_ROWS di
     orchestrator/dataset_diagnostics.py); dataset besar tidak pernah dimuat
@@ -1618,7 +1689,8 @@ def _diagnose_selected(dataset_path: str) -> dict:
     """Diagnosa untuk berkas terpilih, ber-cache berdasarkan mtime+ukuran."""
     try:
         stat = Path(dataset_path).stat()
-        return _cached_diagnosis(dataset_path, stat.st_mtime, stat.st_size)
+        return _cached_diagnosis(dataset_path, stat.st_mtime, stat.st_size,
+                                 _research_signature())
     except OSError as e:
         return {"path": dataset_path, "rows_read": 0, "sampled": False,
                 "detected_format": "unknown", "malformed_lines": 0,
@@ -2179,23 +2251,93 @@ def _close_run_dialogs() -> None:
         dlg.clear_payload(key)
 
 
-def _is_polled_selection(experiment_id: str, pipeline_id, dataset_path) -> bool:
-    """Apakah pipeline & dataset terpilih adalah run yang sedang dipantau.
+#: Run yang dikirim atau dibuka sesi ini, per PILIHAN: ``{pilihan: experiment_id}``.
+#: Satu sesi boleh menjalankan beberapa algoritma sekaligus, jadi satu kunci
+#: `polling_experiment_id` saja tidak cukup: run kedua menimpa yang pertama, dan
+#: halaman algoritma pertama kehilangan progresnya padahal sidebar masih
+#: menampilkannya. `polling_experiment_id` tetap ada sebagai run yang SEDANG
+#: digambar — sidebar dan popup tanda hidup membacanya.
+_RUNS_KEY = "_runs_by_selection"
 
-    Ragu berarti YA: bila run-nya tidak terbaca, tampilan pemantauan yang
-    digambar, karena ia sendiri yang tahu cara menyatakan run hilang dan
-    membersihkan penandanya.
+#: Hasil yang sudah selesai, per pilihan: ``{pilihan: result}``. Menggantikan
+#: satu `last_result` yang dahulu digambar di bawah algoritma APA PUN yang
+#: sedang dipilih, sehingga hasil Random Forest tampil sebagai hasil algoritma
+#: lain lengkap dengan PDF-nya.
+_RESULTS_KEY = "last_result"
+
+
+def _selection_key(pipeline_id, dataset_path) -> str:
+    """Kunci satu pilihan: pipeline + NAMA berkas dataset.
+
+    Nama, bukan jalur: run yang dikirim dari host dan dibaca worker di
+    container mencatat jalur yang berbeda untuk berkas yang sama.
     """
+    return f"{pipeline_id or ''}|{Path(str(dataset_path or '')).name}"
+
+
+def _tracked_runs() -> dict:
+    runs = st.session_state.get(_RUNS_KEY)
+    if not isinstance(runs, dict):
+        runs = {}
+        st.session_state[_RUNS_KEY] = runs
+    return runs
+
+
+def _adopt_polled_run() -> None:
+    """Catat run di `polling_experiment_id` pada pilihannya, bila belum.
+
+    Kunci itu juga disetel dari luar halaman ini — kartu sidebar dan tombol
+    jalankan-ulang pada popup tanda hidup — tanpa tahu pilihan mana yang ia
+    wakili. Pilihannya dibaca sekali dari record eksperimen.
+    """
+    eid = st.session_state.get("polling_experiment_id")
+    runs = _tracked_runs()
+    if not eid or eid in runs.values():
+        return
     try:
-        data = get_experiment_status(experiment_id) or {}
+        data = get_experiment_status(eid) or {}
     except Exception:                       # pragma: no cover - defensif
-        return True
+        logger.debug("Run %s tidak terbaca saat dicatat", eid, exc_info=True)
+        return
     if not data:
-        return True
-    sama_pipeline = data.get("pipeline_id") == pipeline_id
-    sama_dataset = (Path(str(data.get("dataset_path") or "")).name
-                    == Path(str(dataset_path or "")).name)
-    return sama_pipeline and sama_dataset
+        # Record-nya sudah tidak ada: penanda yang menggantung akan menahan
+        # halaman di tampilan eksekusi tanpa satu run pun untuk dipantau.
+        st.session_state.pop("polling_experiment_id", None)
+        return
+    runs[_selection_key(data.get("pipeline_id"), data.get("dataset_path"))] = eid
+
+
+def forget_run(experiment_id) -> None:
+    """Berhenti melacak satu run: ia selesai, gagal, atau tidak dipantau lagi."""
+    runs = _tracked_runs()
+    for key in [k for k, v in runs.items() if v == experiment_id]:
+        runs.pop(key, None)
+    if st.session_state.get("polling_experiment_id") == experiment_id:
+        st.session_state.pop("polling_experiment_id", None)
+
+
+def _all_results() -> dict:
+    results = st.session_state.get(_RESULTS_KEY)
+    if not isinstance(results, dict) or "success" in results:
+        # Bentuk lama (satu hasil, bukan peta) tidak tahu milik pilihan mana,
+        # jadi tidak dapat ditampilkan dengan benar di bawah pilihan apa pun.
+        results = {}
+        st.session_state[_RESULTS_KEY] = results
+    return results
+
+
+def _store_result(result: dict, pipeline_id, dataset_path,
+                  dataset_type=None) -> None:
+    """Simpan hasil di bawah pilihan yang MENGHASILKANNYA, beserta identitasnya."""
+    _all_results()[_selection_key(pipeline_id, dataset_path)] = {
+        **result, "pipeline_id": pipeline_id, "dataset_path": dataset_path,
+        "dataset_type": dataset_type,
+    }
+
+
+def _result_for(pipeline_id, dataset_path) -> dict | None:
+    result = _all_results().get(_selection_key(pipeline_id, dataset_path))
+    return result if isinstance(result, dict) and result.get("success") else None
 
 
 def is_polling() -> bool:
@@ -2204,9 +2346,14 @@ def is_polling() -> bool:
 
 
 def has_visible_result() -> bool:
-    """Hasil eksperimen sesi ini sedang ditampilkan."""
-    result = st.session_state.get("last_result")
-    return bool(isinstance(result, dict) and result.get("success"))
+    """Ada hasil eksperimen sesi ini yang dapat ditampilkan."""
+    results = st.session_state.get(_RESULTS_KEY)
+    if not isinstance(results, dict):
+        return False
+    if "success" in results:                # bentuk lama: satu hasil
+        return bool(results.get("success"))
+    return any(isinstance(r, dict) and r.get("success")
+               for r in results.values())
 
 
 def is_monitoring() -> bool:
@@ -2882,7 +3029,7 @@ def _render_execute():
     #
     # `polling_experiment_id` SENGAJA dibiarkan: pemantauan hanya digambar
     # bila dataset & algoritma terpilih adalah run yang dipantau
-    # (`_is_polled_selection`), jadi berganti dataset sudah menyembunyikannya.
+    # (`_tracked_runs`), jadi berganti dataset sudah menyembunyikannya.
     # Membuangnya justru memutus pemantauan saat kartu sidebar membuka run
     # beserta dataset-nya.
     if st.session_state.get("_validated_path") != dataset_path:
@@ -3048,17 +3195,21 @@ def _render_execute():
     # `session_state`, yang barusan ditulis di atas.
 
     # ── Execute (conditional — only after a pipeline is selected) ───────
-    # Tampilan pemantauan mengambil alih HANYA bila pilihan di layar adalah
-    # run yang dipantau (algoritma dan dataset yang sama). Memilih algoritma
+    # Tampilan pemantauan mengambil alih HANYA bila pilihan di layar punya run
+    # yang sedang dilacak (algoritma dan dataset yang sama). Memilih algoritma
     # lain mengembalikan bagian Eksekusi biasa, jadi algoritma itu dapat
-    # dijalankan juga; run yang dipantau terus berjalan, tetap terlihat di
+    # dijalankan juga; run sebelumnya terus berjalan, tetap terlihat di
     # sidebar, dan progresnya muncul lagi bila algoritmanya dipilih kembali.
-    polled = st.session_state.get("polling_experiment_id")
-    if polled:
+    _adopt_polled_run()
+    if st.session_state.get("polling_experiment_id"):
         st.session_state[_POLL_RENDERED_KEY] = True
-        if _is_polled_selection(polled, selected, dataset_path):
-            _poll_experiment(polled)
-            return
+    tracked = _tracked_runs().get(_selection_key(selected, dataset_path)) if selected else None
+    if tracked:
+        # Run pilihan ini menjadi yang digambar, jadi kartu sidebar yang
+        # ditandai ikut berpindah ke run yang sedang dilihat.
+        st.session_state["polling_experiment_id"] = tracked
+        _poll_experiment(tracked)
+        return
 
     if selected:
         render_section(t("re.sec_execute"), help=t("re.help_execute"))
@@ -3125,9 +3276,11 @@ def _render_execute():
                              run_mode=run_choice["run_mode"],
                              param_overrides=run_choice["param_overrides"])
 
-    # Results (sync path)
-    if "last_result" in st.session_state and st.session_state["last_result"].get("success"):
-        _display_results(st.session_state["last_result"])
+    # Hasil milik pilihan INI saja — bukan hasil terakhir sesi, yang bisa
+    # berasal dari algoritma lain.
+    result = _result_for(selected, dataset_path) if selected else None
+    if result:
+        _display_results(result)
 
 
 def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
@@ -3168,8 +3321,9 @@ def _run_with_status(dataset_type: str, dataset_path: str, pipeline_id: str,
         return
     if result.get("async_mode"):
         st.session_state["polling_experiment_id"] = result["experiment_id"]
+        _tracked_runs()[_selection_key(pipeline_id, dataset_path)] = result["experiment_id"]
     else:
-        st.session_state["last_result"] = result
+        _store_result(result, pipeline_id, dataset_path, dataset_type)
     st.rerun()
 
 
@@ -3180,7 +3334,7 @@ def _poll_experiment(experiment_id: str):
 
     if status_data is None:
         st.error(t("re.msg_exp_not_found"))
-        st.session_state.pop("polling_experiment_id", None)
+        forget_run(experiment_id)
         return
 
     status = status_data["status"]
@@ -3220,7 +3374,7 @@ def _poll_experiment(experiment_id: str):
                         type="tertiary", help=t("ps.btn_cancel_short")):
             r = cancel_experiment(experiment_id)
             if r["success"]:
-                st.session_state.pop("polling_experiment_id", None)
+                forget_run(experiment_id)
                 st.warning(t("re.msg_exp_cancelled"))
             else:
                 st.error(r["message"])
@@ -3257,20 +3411,23 @@ def _poll_experiment(experiment_id: str):
             st.rerun()
 
     elif status == "FINISHED":
-        st.session_state.pop("polling_experiment_id", None)
+        forget_run(experiment_id)
         full = get_full_experiment(experiment_id)
         if full:
-            st.session_state["last_result"] = {
+            # Disimpan di bawah pipeline & dataset RUN INI, dibaca dari
+            # record-nya — bukan dari apa yang kebetulan terpilih di layar.
+            _store_result({
                 "success": True,
                 "experiment_id": experiment_id,
                 "metrics": full.get("metrics", {}),
                 "feature_names": (full.get("metadata") or {}).get("feature_names"),
                 "label_mapping": (full.get("metadata") or {}).get("label_mapping"),
-            }
+            }, status_data.get("pipeline_id"), status_data.get("dataset_path"),
+                status_data.get("dataset_type"))
         st.rerun()
 
     elif status == "FAILED":
-        st.session_state.pop("polling_experiment_id", None)
+        forget_run(experiment_id)
         error_msg = status_data.get("error_message", "Unknown error")
         if error_msg == "Cancelled by user":
             st.warning(t("re.msg_exp_was_cancelled"))
@@ -3308,6 +3465,11 @@ def _display_results(result: dict):
     """Render all metrics and charts via the shared interactive result view."""
     st.header(t("re.sec_results"))
     eid = result["experiment_id"]
+    # Identitas dibaca dari HASILNYA, bukan dari pilihan di layar: hasil dan
+    # PDF-nya harus menyebut pipeline yang benar-benar menghasilkannya.
+    pipeline_id = result.get("pipeline_id") or st.session_state.get("selected_pipeline", "")
+    dataset_type = result.get("dataset_type") or st.session_state.get("dataset_type", "Unknown")
+    dataset_path = result.get("dataset_path") or st.session_state.get("dataset_path", "Unknown")
 
     # Penanda mode di tempat hasil PERTAMA kali terlihat. Dibaca dari record
     # eksperimen, bukan dari pilihan di layar: yang berlaku adalah apa yang
@@ -3322,10 +3484,10 @@ def _display_results(result: dict):
         metrics=metrics,
         label_mapping=result.get("label_mapping"),
         feature_names=result.get("feature_names"),
-        pipeline_id=st.session_state.get("selected_pipeline"),
-        dataset_type=st.session_state.get("dataset_type"),
+        pipeline_id=pipeline_id,
+        dataset_type=dataset_type,
     )
-    render_results(payload, key=eid, pipeline_id=st.session_state.get("selected_pipeline", ""))
+    render_results(payload, key=eid, pipeline_id=pipeline_id)
 
     full = metrics  # PDF/download section below reads the same unified metrics
 
@@ -3334,15 +3496,15 @@ def _display_results(result: dict):
     st.subheader(t("re.sec_download"))
     try:
         from utils.report_generator import generate_report
-        pipe_info = get_pipeline_info(st.session_state.get("selected_pipeline", "")) or {}
+        pipe_info = get_pipeline_info(pipeline_id) or {}
         exp_metadata = get_experiment_metadata(eid) or {}
 
         pdf_bytes = generate_report(
             experiment_id=eid,
-            dataset_type=st.session_state.get("dataset_type", "Unknown"),
-            dataset_path=st.session_state.get("dataset_path", "Unknown"),
+            dataset_type=dataset_type,
+            dataset_path=dataset_path,
             dataset_hash=exp_metadata.get("dataset_hash", full.get("dataset_hash", "N/A")),
-            pipeline_id=st.session_state.get("selected_pipeline", "Unknown"),
+            pipeline_id=pipeline_id or "Unknown",
             pipeline_info=pipe_info,
             metrics=full,
             metadata=exp_metadata,

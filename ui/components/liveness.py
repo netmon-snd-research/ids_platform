@@ -166,6 +166,14 @@ def _on_dismiss() -> None:
 
 
 def _stop_watching() -> None:
+    # Juga dilepas dari pelacakan per pilihan di halaman Jalankan Eksperimen;
+    # tanpa itu halaman langsung memantaunya lagi pada rerun berikutnya.
+    # Impor di dalam fungsi: halaman itu sendiri mengimpor modul ini.
+    from ui.views.run_experiment import forget_run
+
+    eid = st.session_state.get("polling_experiment_id")
+    if eid:
+        forget_run(eid)
     st.session_state.pop("polling_experiment_id", None)
     st.session_state.pop(SHOWN_KEY, None)
 

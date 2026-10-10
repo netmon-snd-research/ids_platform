@@ -1743,13 +1743,27 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
    jadi fokus papan ketik dan pembaca layar tetap bekerja. Tautan HTML akan
    lebih sederhana, tetapi ia memuat ulang halaman dan membuang keadaan sesi,
    termasuk eksperimen yang sedang dipantau. */
+/* Yang ditumpangkan adalah WADAH ELEMEN tombolnya, bukan hanya `.stButton`.
+   Bila wadah itu sendiri ber-`position`, `.stButton` yang absolut mengukur
+   dirinya terhadap wadah setinggi nol itu, dan kartunya tampak dapat diklik
+   tetapi tidak bereaksi. Dengan wadahnya yang absolut, tombol selalu
+   menutupi kartu, apa pun gaya bawaan Streamlit pada wadahnya. */
+[data-testid="stSidebarUserContent"]
+    div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card)
+    > .stElementContainer:has(.stButton) {{
+    position: absolute;
+    inset: 0;
+    width: auto !important;
+    height: auto;
+    margin: 0;
+    z-index: 2;
+}}
 [data-testid="stSidebarUserContent"]
     div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card)
     .stButton {{
     position: absolute;
     inset: 0;
     margin: 0;
-    z-index: 2;
 }}
 [data-testid="stSidebarUserContent"]
     div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card)
@@ -1761,6 +1775,7 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-rs-filters)
     border-radius: 12px;
     background: transparent;
     color: transparent;                  /* labelnya hanya untuk pembaca layar */
+    cursor: pointer;
 }}
 [data-testid="stSidebarUserContent"]
     div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-run-card)
