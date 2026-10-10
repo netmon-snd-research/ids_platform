@@ -250,6 +250,9 @@ def research_catalog(db_path=None) -> list[dict]:
             # Cap waktu TIDAK PERNAH dikarang: research bawaan tidak punya
             # baris basis data, jadi ia memang tidak punya tanggal.
             "created_at": (row or {}).get("registered_at") or "",
+            # Siapa yang menyetujui: baris identitas research lahir saat
+            # pengajuannya disetujui, oleh peninjau yang menyetujuinya.
+            "approved_by": (row or {}).get("registered_by") or "",
             "updated_at": (row or {}).get("updated_at") or "",
             "updated_by": (row or {}).get("updated_by") or "",
             "edited": bool(row) and not uploaded,
@@ -483,9 +486,26 @@ _RS_COLS = (
     # terpatah di tengah kata menjadi "Algorit / ma". Ruang yang dilepas kolom
     # Dataset sebagian jatuh ke sini supaya judulnya utuh pada lebar sedang.
     ("rs.col_algorithms", 4),
+    # Kapan research ini disetujui dan oleh siapa. Research bawaan tidak
+    # punya tanggal: ia ada karena kodenya ada, bukan karena disetujui.
+    ("rs.col_approved", 5),
     ("rs.col_status", 4),
     ("", 10),
 )
+
+
+def _approved_cell(row: dict) -> str:
+    """Tanggal disetujui, dengan penyetuju di bawahnya; "Bawaan" bila bawaan."""
+    if row.get("origin") != ORIGIN_UPLOADED:
+        return f'<span class="ids-row-sub">{escape(t("rs.origin_builtin"))}</span>'
+    when = row.get("created_at") or ""
+    if not when:
+        return "-"
+    from ui.components.tables import human_datetime
+    oleh = row.get("approved_by") or ""
+    return (escape(human_datetime(when))
+            + (f'<span class="ids-row-sub">{escape(t("rs.approved_by", who=oleh))}</span>'
+               if oleh else ""))
 
 
 def _render_head() -> None:
@@ -494,7 +514,8 @@ def _render_head() -> None:
     # dan judul kolomnya disembunyikan; jumlah algoritma karena itu membawa
     # labelnya sendiri. Status tidak perlu: pil "Aktif" sudah terbaca sendiri.
     from ui.components.sections import mobile_card_labels
-    mobile_card_labels("ids-rs-row", {2: t("rs.col_algorithms")})
+    mobile_card_labels("ids-rs-row", {2: t("rs.col_algorithms"),
+                                      3: t("rs.col_approved")})
     with st.container():
         st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
                     unsafe_allow_html=True)
@@ -526,10 +547,11 @@ def _render_row(row: dict, user: dict | None) -> None:
             + (f'<span class="ids-row-sub">{escape(sub)}</span>' if sub else ""),
             unsafe_allow_html=True)
         sel[1].markdown(str(row.get("algorithms", 0)))
+        sel[2].markdown(_approved_cell(row), unsafe_allow_html=True)
         # Pil berlatar, bukan emoji bulat: warna emoji berbeda di tiap sistem
         # operasi, sedangkan pil ini sama dengan pil keadaan di tabel lain.
         from ui.components.grid import state_badge
-        sel[2].markdown(state_badge(status_label(row),
+        sel[3].markdown(state_badge(status_label(row),
                                     "ok" if row.get("active") else "off"),
                         unsafe_allow_html=True)
 
@@ -538,7 +560,7 @@ def _render_row(row: dict, user: dict | None) -> None:
         # Slot ketiga sengaja lebih sempit — ia hanya terisi pada research yang
         # pernah disunting, dan memberinya sepertiga penuh membuat dua tombol
         # yang SELALU ada terjepit sampai labelnya patah di tengah kata.
-        aksi = sel[3].columns([4, 4, 3])
+        aksi = sel[4].columns([4, 4, 3])
         if aksi[0].button(t("rs.btn_edit"), key=f"rs_edit_{dtype}",
                           use_container_width=True):
             st.session_state[EDIT_KEY] = dtype

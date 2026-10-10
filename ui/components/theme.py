@@ -685,6 +685,34 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
     box-shadow: 0 1px 3px rgba(0,0,0,.14);
 }}
 
+/* ── Varian GARIS: pengalih bagian bergaya tab ─────────────────────────
+   Widget yang sama (segmented control, supaya pilihannya bertahan melewati
+   rerun), tetapi tanpa wadah berlatar: pilihan ditandai garis bawah berwarna
+   aksen, seperti tab. Dipasang lewat kelas kunci widget-nya sendiri
+   (`.st-key-<key>`), jadi pemilih algoritma dan pengalih lain tidak berubah. */
+.st-key-contrib_pipe_section [data-testid="{SEG_GROUP}"] {{
+    background: transparent;
+    padding: 0;
+    gap: 1.25rem;
+    border-radius: 0;
+    width: 100%;
+    border-bottom: 1px solid rgba(127,127,127,.25);
+}}
+.st-key-contrib_pipe_section [data-testid="{SEG_GROUP}"] button {{
+    border-radius: 0;
+    padding: .35rem .1rem;
+    margin-bottom: -1px;                 /* garis aktif menimpa garis dasar */
+    border-bottom: 2px solid transparent;
+    box-shadow: none;
+}}
+.st-key-contrib_pipe_section [data-testid="{SEG_GROUP}"] [data-testid="{SEG_ITEM_ACTIVE}"],
+.st-key-contrib_pipe_section [data-testid="{SEG_GROUP}"] button[aria-checked="true"] {{
+    background: transparent;
+    box-shadow: none;
+    color: var(--primary-color, currentColor);
+    border-bottom-color: var(--primary-color, currentColor);
+}}
+
 /* ── Katalog: hierarki jarak & tombol seragam ──────────────────────────
    Jarak DI DALAM satu blok penelitian lebih kecil daripada jarak ANTAR blok,
    supaya pengelompokannya terbaca. Pemisah antar blok memakai jarak terbesar

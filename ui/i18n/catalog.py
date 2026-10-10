@@ -1108,6 +1108,20 @@ CATALOG: dict[str, dict[str, str]] = {
     "dx.cause_label_missing": {
         "id": "Tidak ada kolom `{column}` untuk dipakai sebagai label.",
         "en": "No `{column}` column to use as the label."},
+    "dx.cause_unlabeled": {
+        "id": "Struktur fiturnya cocok ({features} kolom), tetapi berkas ini tidak "
+              "berlabel: kolom `{column}` tidak ada, jadi tidak dapat dipakai untuk "
+              "melatih maupun mengevaluasi.",
+        "en": "The feature structure fits ({features} columns), but this file is "
+              "unlabeled: there is no `{column}` column, so it cannot be used to "
+              "train or evaluate."},
+    "dx.action_unlabeled": {
+        "id": "**Agar cocok:** pakai berkas dari sumber yang sama yang memuat kolom "
+              "`{column}`, misalnya data latihnya. Test set tanpa label biasanya "
+              "labelnya disimpan penyelenggara.",
+        "en": "**To fit:** use a file from the same source that includes the "
+              "`{column}` column, such as its training data. Unlabeled test sets "
+              "usually keep their labels with the organiser."},
     "dx.cause_features_missing": {
         "id": "{count} kolom yang dibutuhkan tidak ada di berkas Anda.",
         "en": "{count} required columns are missing from your file."},
@@ -1483,6 +1497,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "rs.col_algorithms": {"id": "Algoritma", "en": "Algorithms"},
     "rs.col_experiments": {"id": "Eksperimen", "en": "Experiments"},
     "rs.col_status": {"id": "Status", "en": "Status"},
+    "rs.col_approved": {"id": "Disetujui", "en": "Approved"},
+    "rs.approved_by": {"id": "oleh {who}", "en": "by {who}"},
     "rs.lbl_dataset": {"id": "Dataset", "en": "Dataset"},
     "rs.lbl_institution": {"id": "Institusi", "en": "Institution"},
     "rs.lbl_updated": {"id": "Diperbarui", "en": "Updated"},
@@ -1795,6 +1811,9 @@ CATALOG: dict[str, dict[str, str]] = {
                                 "en": "Package is valid."},
     "ap.sec_my_submissions": {"id": "Pengajuan saya ({count})",
                               "en": "My submissions ({count})"},
+    "ap.tab_new_upload": {"id": "Unggah baru", "en": "New upload"},
+    "ap.my_none": {"id": "Belum ada pengajuan pipeline.",
+                   "en": "No pipeline submissions yet."},
     "ap.my_submitted": {"id": "#{number} · diajukan {when}",
                         "en": "#{number} · submitted {when}"},
     "ap.my_reject_reason": {"id": "Alasan ditolak: {note}",

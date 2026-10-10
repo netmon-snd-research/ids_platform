@@ -3538,6 +3538,39 @@ _MY_EDIT_KEY = "_contrib_my_edit"
 _MY_STATUS_STATE = {"pending": "warn", "approved": "ok", "rejected": "bad"}
 
 
+#: Pengalih bagian halaman Unggah Pipeline: unggah baru, atau pengajuan sendiri.
+_PIPE_SECTION_KEY = "contrib_pipe_section"
+_PIPE_SECTION_LAST = "_contrib_pipe_section_last"
+PIPE_NEW, PIPE_MINE = "new", "mine"
+
+
+def _my_pipeline_submissions(user: dict) -> list[dict]:
+    from orchestrator.submission_service import list_submissions
+    return _safe_read("pengajuan saya", list_submissions, kind=KIND_PIPELINE,
+                      submitted_by=(user or {}).get("username"), default=[]) or []
+
+
+def _render_pipe_section_switch(user: dict) -> str:
+    """"Unggah baru | Pengajuan saya (N)" sebagai tab bergaris; bagian terpilih.
+
+    Segmented control, bukan `st.tabs`: pilihannya disimpan di session_state,
+    jadi menekan Sunting atau Hapus (yang memicu rerun) tidak melempar pengguna
+    kembali ke tab pertama. Gaya garisnya ada di `theme` (`.st-key-...`).
+    """
+    jumlah = len(_my_pipeline_submissions(user))
+    last = st.session_state.get(_PIPE_SECTION_LAST, PIPE_NEW)
+    if st.session_state.get(_PIPE_SECTION_KEY) not in (PIPE_NEW, PIPE_MINE):
+        st.session_state[_PIPE_SECTION_KEY] = last
+    label = {PIPE_NEW: t("ap.tab_new_upload"),
+             PIPE_MINE: t("ap.sec_my_submissions", count=jumlah)}
+    chosen = st.segmented_control(
+        t("ap.lbl_section"), [PIPE_NEW, PIPE_MINE], key=_PIPE_SECTION_KEY,
+        format_func=lambda k: label[k], label_visibility="collapsed")
+    section = chosen if chosen in (PIPE_NEW, PIPE_MINE) else last
+    st.session_state[_PIPE_SECTION_LAST] = section
+    return section
+
+
 def _render_my_submissions(user: dict) -> None:
     """Pengajuan pipeline MILIK pengguna ini: statusnya, lalu sunting atau hapus.
 
@@ -3549,67 +3582,62 @@ def _render_my_submissions(user: dict) -> None:
     ditegakkan di lapis layanan: pengaju hanya menyunting kirimannya yang
     masih menunggu, dan hanya menghapus yang belum disetujui.
     """
-    from orchestrator.submission_service import (
-        list_submissions, revision_blocker, withdraw_blocker,
-    )
+    from orchestrator.submission_service import revision_blocker, withdraw_blocker
 
-    items = _safe_read("pengajuan saya", list_submissions, kind=KIND_PIPELINE,
-                       submitted_by=user.get("username"), default=[]) or []
+    items = _my_pipeline_submissions(user)
     if not items:
+        prose(t("ap.my_none"), key="my_submissions_none")
         return
     by_id = {i["id"]: i for i in items}
     rows = sr.my_submission_rows(items, user.get("username"))
-    terbuka = st.session_state.get(_MY_EDIT_KEY) or \
-        st.session_state.get(_CONFIRM_DEL_SUB_KEY)
-    perlu_dilihat = any(r["status"] != "approved" for r in rows)
 
-    with st.expander(t("ap.sec_my_submissions", count=len(rows)),
-                     expanded=bool(terbuka in by_id or perlu_dilihat)):
-        for row in rows:
-            item = by_id.get(row["id"]) or {}
-            sid = row["id"]
-            with st.container(border=True):
-                sel = st.columns([6, 2, 2, 2], vertical_alignment="center")
-                sel[0].markdown(
-                    f"**{escape(row['name'] or '-')}**"
-                    f'<span class="ids-row-sub">'
-                    f"{escape(t('ap.my_submitted', number=sid, when=human_datetime(row['submitted_at'])))}"
-                    "</span>", unsafe_allow_html=True)
-                sel[1].markdown(grid.state_badge(
-                    sr.status_label(row["status"]),
-                    _MY_STATUS_STATE.get(row["status"], "warn")),
-                    unsafe_allow_html=True)
+    for row in rows:
+        item = by_id.get(row["id"]) or {}
+        sid = row["id"]
+        with st.container(border=True):
+            sel = st.columns([6, 2, 2, 2], vertical_alignment="center")
+            sel[0].markdown(
+                # HTML, bukan `**…**`: nama berakhiran spasi membuat tanda
+                # tebal markdown tidak tertutup dan tampil apa adanya.
+                f"<strong>{escape(str(row['name'] or '-').strip())}</strong>"
+                f'<span class="ids-row-sub">'
+                f"{escape(t('ap.my_submitted', number=sid, when=human_datetime(row['submitted_at'])))}"
+                "</span>", unsafe_allow_html=True)
+            sel[1].markdown(grid.state_badge(
+                sr.status_label(row["status"]),
+                _MY_STATUS_STATE.get(row["status"], "warn")),
+                unsafe_allow_html=True)
 
-                sunting = revision_blocker(item)
-                if sel[2].button(t("ap.btn_edit_submission"), key=f"my_edit_{sid}",
-                                 use_container_width=True, disabled=bool(sunting),
-                                 help=t(sunting) if sunting else None):
-                    st.session_state[_MY_EDIT_KEY] = sid
-                    st.session_state[_REVISE_OPEN_KEY] = sid
-                    st.session_state.pop(_CONFIRM_DEL_SUB_KEY, None)
-                    st.rerun()
-                hapus = withdraw_blocker(item, user)
-                if sel[3].button(t("ap.btn_withdraw"), key=f"my_del_{sid}",
-                                 use_container_width=True, disabled=bool(hapus),
-                                 help=t(hapus) if hapus else None):
-                    st.session_state[_CONFIRM_DEL_SUB_KEY] = sid
+            sunting = revision_blocker(item)
+            if sel[2].button(t("ap.btn_edit_submission"), key=f"my_edit_{sid}",
+                             use_container_width=True, disabled=bool(sunting),
+                             help=t(sunting) if sunting else None):
+                st.session_state[_MY_EDIT_KEY] = sid
+                st.session_state[_REVISE_OPEN_KEY] = sid
+                st.session_state.pop(_CONFIRM_DEL_SUB_KEY, None)
+                st.rerun()
+            hapus = withdraw_blocker(item, user)
+            if sel[3].button(t("ap.btn_withdraw"), key=f"my_del_{sid}",
+                             use_container_width=True, disabled=bool(hapus),
+                             help=t(hapus) if hapus else None):
+                st.session_state[_CONFIRM_DEL_SUB_KEY] = sid
+                st.session_state.pop(_MY_EDIT_KEY, None)
+                st.rerun()
+
+            # Alasan penolakan adalah satu-satunya hal yang dapat
+            # ditindaklanjuti pengaju, jadi ia tampil, tidak disembunyikan.
+            if row["status"] == "rejected" and row["note"]:
+                st.caption(t("ap.my_reject_reason", note=row["note"]))
+
+            if st.session_state.get(_MY_EDIT_KEY) == sid:
+                if sunting or st.session_state.get(_REVISE_OPEN_KEY) != sid:
+                    # Revisi sudah disimpan atau dibatalkan (formulirnya
+                    # melepas kuncinya sendiri): tutup di sini juga.
                     st.session_state.pop(_MY_EDIT_KEY, None)
-                    st.rerun()
-
-                # Alasan penolakan adalah satu-satunya hal yang dapat
-                # ditindaklanjuti pengaju, jadi ia tampil, tidak disembunyikan.
-                if row["status"] == "rejected" and row["note"]:
-                    st.caption(t("ap.my_reject_reason", note=row["note"]))
-
-                if st.session_state.get(_MY_EDIT_KEY) == sid:
-                    if sunting or st.session_state.get(_REVISE_OPEN_KEY) != sid:
-                        # Revisi sudah disimpan atau dibatalkan (formulirnya
-                        # melepas kuncinya sendiri): tutup di sini juga.
-                        st.session_state.pop(_MY_EDIT_KEY, None)
-                    else:
-                        _render_revision_upload(item, user)
-                if st.session_state.get(_CONFIRM_DEL_SUB_KEY) == sid and not hapus:
-                    _render_delete_submission(item, user)
+                else:
+                    _render_revision_upload(item, user)
+            if st.session_state.get(_CONFIRM_DEL_SUB_KEY) == sid and not hapus:
+                _render_delete_submission(item, user)
 
 
 def _render_pipeline_flow() -> None:
@@ -3632,9 +3660,12 @@ def _render_pipeline_flow() -> None:
     # tombol yang tampak aktif padahal aksinya pasti ditolak lapis aksi.
     may_upload = _render_upload_gate("pipeline")
     if may_upload:
-        # Kiriman sebelumnya di ATAS formulir: pengguna yang kembali ke halaman
-        # ini paling sering ingin tahu nasib kirimannya, bukan mengirim lagi.
-        _render_my_submissions(current_user() or {})
+        # Dua bagian yang tidak pernah dibutuhkan bersamaan: mengirim paket
+        # baru, atau memeriksa kiriman sebelumnya. Ditampilkan satu per satu.
+        user = current_user() or {}
+        if _render_pipe_section_switch(user) == PIPE_MINE:
+            _render_my_submissions(user)
+            return
 
     uploaded = st.file_uploader(
         t("ap.lbl_pipeline_files"), type=["py", "ipynb"], accept_multiple_files=True,
