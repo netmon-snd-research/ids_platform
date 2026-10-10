@@ -373,10 +373,12 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.help_back_running": {
         "id": "Eksperimen tetap berjalan. Buka lagi lewat kartu di sidebar.",
         "en": "The experiment keeps running. Reopen it from the sidebar card."},
-    "re.lbl_pick_pipeline": {"id": "Pilih research pipeline",
-                             "en": "Choose research pipeline"},
-    "re.ph_pick_pipeline": {"id": "Pilih research pipeline…",
-                            "en": "Choose a research pipeline…"},
+    # Tabel pemilihan research pipeline, sebentuk dengan tabel dataset.
+    "re.col_research_fit": {"id": "Kecocokan", "en": "Fit"},
+    "re.fit_ok": {"id": "Cocok", "en": "Fits"},
+    "re.fit_no": {"id": "Belum cocok", "en": "Does not fit"},
+    "re.btn_pick_research": {"id": "Pilih", "en": "Select"},
+    "re.btn_change_research": {"id": "Ganti research", "en": "Change research"},
     "re.lbl_algorithm": {"id": "Algoritma", "en": "Algorithm"},
     "re.lbl_pick_algorithm": {"id": "Pilih algoritma", "en": "Choose algorithm"},
     "re.ph_pick_algorithm": {"id": "Pilih algoritma…", "en": "Choose an algorithm…"},

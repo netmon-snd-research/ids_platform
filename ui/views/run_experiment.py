@@ -2062,6 +2062,77 @@ _CX_COLS = (
 )
 _CX_QUERY_KEY = "_cx_query"
 
+#: Kolom tabel pemilihan research pipeline. Bentuknya mengikuti tabel dataset
+#: di atasnya dan daftar Kelola Research: nama + kontributor di kolom pertama,
+#: kolom terakhir tanpa judul berisi tombol.
+_RP_COLS = (
+    ("rs.col_pipeline", 16),
+    ("re.col_research_fit", 5),
+    ("", 6),
+)
+#: Kunci sesi research terpilih. Dahulu kunci widget dropdown; kini kunci biasa.
+RESEARCH_SELECT_KEY = "research_select"
+
+
+def _render_research_table(research_keys, research_display: dict,
+                           diag: dict) -> None:
+    """Daftar research pipeline yang dapat dipakai dataset terpilih, lalu pilih.
+
+    Kecocokannya dibaca dari diagnosa yang sudah di-cache, tanpa pembacaan
+    berkas tambahan. Yang cocok lebih dulu; yang belum cocok tetap terdaftar
+    karena tombol Run-nya yang dikunci, bukan pilihannya.
+    """
+    import html
+
+    from ui.components.grid import state_badge
+    from ui.components.research_manage import catalog_rows, credit_line
+
+    results = diag.get("results") or {}
+    try:
+        katalog = {r["dataset_type"]: r for r in catalog_rows()}
+    except Exception:                       # pragma: no cover - defensif
+        katalog = {}
+
+    def _cocok(dtype) -> bool:
+        return bool((results.get(dtype) or {}).get("compatible", True))
+
+    urut = sorted(research_keys, key=lambda d: not _cocok(d))
+    lebar = [b for _, b in _RP_COLS]
+    mobile_card_labels("ids-q-rp",
+                       card_labels(_RP_COLS, skip=("re.col_research_fit",)))
+    with st.container():
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
+                    unsafe_allow_html=True)
+        kepala = st.columns(lebar, vertical_alignment="center")
+        for kol, (kunci, _) in zip(kepala, _RP_COLS):
+            kol.markdown(f"**{t(kunci)}**" if kunci else "")
+
+    for dtype in urut:
+        row = katalog.get(dtype) or {}
+        with st.container(border=True):
+            st.markdown('<span class="ids-queue-row ids-mcard ids-q-rp"></span>',
+                        unsafe_allow_html=True)
+            sel = st.columns(lebar, vertical_alignment="center")
+            judul = html.escape(str(row.get("full_name")
+                                    or research_display.get(dtype, dtype)))
+            sub = credit_line(row) if row else ""
+            sel[0].markdown(
+                f'<span title="{judul}">{judul}</span>'
+                + (f'<span class="ids-row-sub">{html.escape(sub)}</span>'
+                   if sub else ""),
+                unsafe_allow_html=True)
+            cocok = _cocok(dtype)
+            sel[1].markdown(state_badge(t("re.fit_ok") if cocok
+                                        else t("re.fit_no"),
+                                        "ok" if cocok else "bad"),
+                            unsafe_allow_html=True)
+            aksi = sel[2].columns(2)
+            if aksi[1].button(t("re.btn_pick_research"), key=f"rp_pick_{dtype}",
+                              use_container_width=True):
+                st.session_state[RESEARCH_SELECT_KEY] = dtype
+                st.session_state.pop("algorithm_select", None)
+                st.rerun()
+
 
 def _render_compat_boxes(diag: dict) -> None:
     """Daftar research pipeline untuk diuji, satu baris per research.
@@ -2257,8 +2328,8 @@ _VIEW_KEY = "_run_view"
 VIEW_CATALOG = "catalog"
 VIEW_EXECUTE = "execute"
 
-# Pipeline yang dipilih dari katalog, menunggu diterapkan ke selectbox saat
-# dataset yang cocok sudah dipilih. Sengaja TERPISAH dari kunci widget
+# Pipeline yang dipilih dari katalog, menunggu diterapkan saat dataset yang
+# cocok sudah dipilih. Sengaja TERPISAH dari kunci pilihan
 # (`research_select`/`algorithm_select`) yang dibuang setiap kali dataset
 # berganti — dan agar nilai yang tidak cocok tidak pernah masuk ke widget.
 _PENDING_KEY = "_run_pending_pipeline"
@@ -3141,14 +3212,32 @@ def _render_execute():
     # dengan dataset terpilih yang dapat terpasang.
     _apply_pending_selection(research_groups)
 
+    # TANPA dropdown, sama seperti pemilihan dataset: tabel memuat setiap
+    # research yang dapat dipakai beserta tombol Pilih-nya. Pilihan yang sudah
+    # tidak ada di daftar dibuang. Satu-satunya research langsung terpilih,
+    # seperti dropdown dahulu, dan tidak diberi tombol ganti.
     research_keys = list(research_groups.keys())
-    research = st.selectbox(
-        t("re.lbl_pick_pipeline"), research_keys,
-        index=0 if len(research_keys) == 1 else None,
-        placeholder=t("re.ph_pick_pipeline"),
-        format_func=lambda k: research_display.get(k, k),
-        key="research_select", label_visibility="collapsed",
-    )
+    research = st.session_state.get(RESEARCH_SELECT_KEY)
+    if research not in research_groups:
+        st.session_state.pop(RESEARCH_SELECT_KEY, None)
+        research = None
+    if research is None and len(research_keys) == 1:
+        research = research_keys[0]
+        st.session_state[RESEARCH_SELECT_KEY] = research
+
+    if research:
+        import html
+
+        kiri, kanan = st.columns([5, 1], vertical_alignment="center")
+        kiri.markdown(f"**{html.escape(research_display.get(research, research))}**")
+        if len(research_keys) > 1 and kanan.button(
+                t("re.btn_change_research"), key="rp_change",
+                use_container_width=True):
+            st.session_state.pop(RESEARCH_SELECT_KEY, None)
+            st.session_state.pop("algorithm_select", None)
+            st.rerun()
+    else:
+        _render_research_table(research_keys, research_display, _diag)
 
     selected = None
     _research_compatible = True
