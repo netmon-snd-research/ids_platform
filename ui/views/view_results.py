@@ -657,7 +657,7 @@ _CMP_CSS = """
 .ids-cmp tr.ids-cmp-diff td { background: rgba(127,127,127,.13);
            font-weight: 600; }
 .ids-cmp tr.ids-cmp-diff td.ids-cmp-label::before {
-           content: "\0394\00a0"; opacity: .65; }
+           content: "\\0394\\00a0"; opacity: .65; }
 </style>
 """
 
