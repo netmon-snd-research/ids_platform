@@ -2469,6 +2469,9 @@ def _render_execute_header() -> None:
                    "Kembali ke katalog pipeline."):
         st.session_state.pop("polling_experiment_id", None)
         st.session_state.pop(_POLL_RENDERED_KEY, None)
+        # Kembali menutup kunjungan ini: hasilnya tidak boleh muncul lagi
+        # saat algoritma yang sama dipilih nanti.
+        st.session_state.pop(_RESULTS_KEY, None)
         go_to_catalog()
         st.rerun()
     missed = st.session_state.get(_PENDING_MISS_KEY)
@@ -3487,7 +3490,13 @@ def _render_result_mode_banner(experiment_id: str) -> None:
                      exc_info=True)
         return
 
-    st.markdown(f"**{rm.run_mode_badge(row.get('run_mode'))}**")
+    # Hasil SELALU menyebut run mana yang menghasilkannya dan kapan. Tanpa
+    # itu, hasil run lama terbaca seperti hasil yang baru saja dijalankan.
+    from ui.components.tables import human_datetime
+
+    asal = t("re.result_origin", run=str(experiment_id)[:8],
+             when=human_datetime(row.get("completed_at")) or "-")
+    st.markdown(f"**{rm.run_mode_badge(row.get('run_mode'))}** · {asal}")
 
 
 def _display_results(result: dict):

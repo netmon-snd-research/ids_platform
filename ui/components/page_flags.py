@@ -65,7 +65,14 @@ def take_page_request() -> str | None:
 # datang dari ui/components/dialogs.py — satu tempat pendaftaran, sehingga
 # menambah modal baru di sana otomatis ikut dibersihkan di sini dan tidak ada
 # daftar kedua yang bisa ketinggalan.
-PAGE_SCOPED_KEYS: tuple[str, ...] = DIALOG_KEYS
+#
+# Ditambah hasil eksperimen yang ditampilkan halaman Jalankan Eksperimen
+# (`last_result`, peta hasil per algoritma). Hasil itu milik KUNJUNGAN yang
+# menjalankan atau membuka run-nya; dibiarkan, ia muncul lagi di bawah
+# algoritma yang sama berjam-jam kemudian seolah baru saja dijalankan.
+# Pelacakan run yang masih berjalan TIDAK ikut dibuang: run itu tetap dapat
+# dibuka lagi lewat kartu sidebar.
+PAGE_SCOPED_KEYS: tuple[str, ...] = DIALOG_KEYS + ("last_result",)
 
 # Awalan penanda SUB-TAMPILAN milik view: "sedang membuka apa" di dalam sebuah
 # halaman (mode kontribusi, bagian yang aktif, pipeline yang sedang disunting).

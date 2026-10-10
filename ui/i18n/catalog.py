@@ -281,6 +281,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.ds_private": {"id": "🔒 Privat", "en": "🔒 Private"},
     "re.ds_private_of": {"id": "🔒 Privat · {owner}", "en": "🔒 Private · {owner}"},
     "re.btn_delete_dataset": {"id": "Hapus", "en": "Delete"},
+    "re.result_origin": {"id": "run `{run}` · selesai {when}",
+                         "en": "run `{run}` · finished {when}"},
     "re.ds_bound_to": {"id": "Dataset research · {research}",
                        "en": "Research dataset · {research}"},
     "re.ds_bound_no_delete": {
