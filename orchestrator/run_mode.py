@@ -52,12 +52,12 @@ ALL_RUN_MODES = [RUN_MODE_OFFICIAL, RUN_MODE_EXPLORATION]
 DEFAULT_RUN_MODE = RUN_MODE_OFFICIAL
 
 RUN_MODE_LABELS = {
-    RUN_MODE_OFFICIAL: "Run resmi",
-    RUN_MODE_EXPLORATION: "Run eksplorasi",
+    RUN_MODE_OFFICIAL: "Run terkunci",
+    RUN_MODE_EXPLORATION: "Run kustom",
 }
 RUN_MODE_BADGES = {
-    RUN_MODE_OFFICIAL: "🔒 Resmi",
-    RUN_MODE_EXPLORATION: "🧪 Eksplorasi",
+    RUN_MODE_OFFICIAL: "🔒 Terkunci",
+    RUN_MODE_EXPLORATION: "🧪 Kustom",
 }
 RUN_MODE_HINTS = {
     RUN_MODE_OFFICIAL: "Parameter terkunci sesuai paper rujukan.",
@@ -66,7 +66,7 @@ RUN_MODE_HINTS = {
 
 # Peringatan yang WAJIB tampil saat mode eksplorasi dipilih. Ringkas: dua baris.
 EXPLORATION_WARNING = (
-    "Hasil run eksplorasi TIDAK masuk perbandingan resmi dan tidak dipakai "
+    "Hasil run kustom TIDAK masuk perbandingan resmi dan tidak dipakai "
     "sebagai dasar replikasi. Setiap tampilan hasilnya diberi penanda "
     f"{RUN_MODE_BADGES[RUN_MODE_EXPLORATION]}."
 )
@@ -74,8 +74,8 @@ EXPLORATION_WARNING = (
 # Peringatan saat kedua mode disandingkan. Setara bobotnya dengan peringatan
 # semantik metrik lintas keluarga pipeline (ui/components/experiment_table.py).
 MIXED_MODE_WARNING = (
-    "Pilihan ini mencampur run resmi (parameter terkunci) dengan run "
-    "eksplorasi (parameter disesuaikan). Keduanya TIDAK sebanding: perbedaan "
+    "Pilihan ini mencampur run terkunci dengan run kustom (parameter "
+    "disesuaikan). Keduanya TIDAK sebanding: perbedaan "
     "angka bisa berasal dari perbedaan parameter, bukan dari pipeline-nya."
 )
 
@@ -458,7 +458,7 @@ def resolve_params(pipeline_id: str, run_mode=None, overrides: dict | None = Non
     if mode == RUN_MODE_OFFICIAL:
         if overrides:
             logger.info(
-                "Run resmi %s: %d override diabaikan sepenuhnya (parameter terkunci)",
+                "Run terkunci %s: %d override diabaikan sepenuhnya (parameter terkunci)",
                 pipeline_id, len(overrides),
             )
         return {"run_mode": RUN_MODE_OFFICIAL, "params": dict(locked),

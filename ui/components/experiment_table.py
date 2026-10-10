@@ -101,8 +101,8 @@ PARAM_PROVENANCE = (
 )
 PARAM_RECORDED_MARK = "✓"
 MODE_COLUMN_NOTE = (
-    "Kolom Mode: 🔒 Resmi = parameter terkunci, dasar perbandingan & replikasi; "
-    "🧪 Eksplorasi = parameter disesuaikan, di luar perbandingan resmi."
+    "Kolom Mode: 🔒 Terkunci = parameter sesuai paper rujukan, dasar perbandingan "
+    "& replikasi; 🧪 Kustom = parameter disesuaikan, di luar perbandingan resmi."
 )
 
 
@@ -499,7 +499,7 @@ def filter_options(rows) -> dict:
 
 MODE_FILTER_LABELS = dict(RUN_MODE_BADGES)
 MODE_FILTER_DEFAULT_NOTE = (
-    "Bawaan menampilkan SEMUA mode: run eksplorasi tidak disembunyikan, "
+    "Bawaan menampilkan SEMUA mode: run kustom tidak disembunyikan, "
     "hanya ditandai."
 )
 

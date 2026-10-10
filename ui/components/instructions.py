@@ -433,7 +433,7 @@ FORBIDDEN_FRAME = ("Ini yang memisahkan masukan yang dikendalikan pengguna dari 
 FORBIDDEN_ACTIONS = (
     "Mengubah dataset asli.",
     "Mengubah hyperparameter terkunci sendiri saat berjalan: penyesuaian "
-    "hanya lewat run eksplorasi platform, yang mencatat & menandainya.",
+    "hanya lewat run kustom platform, yang mencatat & menandainya.",
     "Fit praproses pada data uji.",
     "Mengganti algoritma secara dinamis.",
     "Mengubah seleksi fitur secara acak / tidak dideklarasikan.",

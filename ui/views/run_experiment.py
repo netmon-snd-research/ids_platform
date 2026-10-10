@@ -2865,8 +2865,8 @@ def _detail_algorithm(state: dict) -> None:
         st.warning(info["runtime_warning"])
     # Klaim lama "semua parameter terkunci" hanya benar untuk run RESMI, yang
     # tetap menjadi bawaan. Dikatakan apa adanya.
-    st.info("Nilai di atas adalah parameter TERKUNCI yang dipakai run resmi. "
-            "Run eksplorasi dapat menyesuaikan sebagian di antaranya; hasilnya "
+    st.info("Nilai di atas adalah parameter TERKUNCI, sesuai paper rujukan. "
+            "Run kustom dapat menyesuaikan sebagian di antaranya; hasilnya "
             "ditandai dan tidak masuk perbandingan resmi.")
 
 

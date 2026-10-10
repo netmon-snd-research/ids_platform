@@ -56,7 +56,7 @@ NO_TUNABLE_NOTE = (
     "algoritma, seleksi fitur, atau batas sumber daya."
 )
 LOCKED_TABLE_NOTE = (
-    "Parameter selalu ditampilkan, juga pada run resmi. Yang terkunci disertai "
+    "Parameter selalu ditampilkan, juga pada run terkunci. Yang terkunci disertai "
     "alasannya."
 )
 
@@ -148,7 +148,7 @@ def render_locked_table(rows: list[dict]) -> None:
         return
     lines = ["| Parameter | Nilai | Status |", "| --- | --- | --- |"]
     for row in rows:
-        status = ("dapat disesuaikan pada run eksplorasi" if row["tunable"]
+        status = ("dapat disesuaikan pada run kustom" if row["tunable"]
                   else f"terkunci · {row['reason']}")
         lines.append(f"| `{row['key']}` | `{row['default']}` | {status} |")
     st.markdown(chr(10).join(lines))

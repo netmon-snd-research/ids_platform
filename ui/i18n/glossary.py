@@ -37,8 +37,8 @@ GLOSSARY: dict[str, tuple[str, str]] = {
     "compatibility": ("kecocokan", "compatibility"),
 
     # Mode eksekusi.
-    "official_run": ("resmi", "official"),
-    "exploration_run": ("eksplorasi", "exploration"),
+    "official_run": ("terkunci", "locked"),
+    "exploration_run": ("kustom", "custom"),
     "run_mode": ("mode eksekusi", "run mode"),
 
     # Peran.

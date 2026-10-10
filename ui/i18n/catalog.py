@@ -508,10 +508,10 @@ CATALOG: dict[str, dict[str, str]] = {
 
     # ── Keterangan WAJIB — maknanya harus sama persis ────────────────────
     "re.note_locked_params": {
-        "id": "Nilai di atas adalah parameter TERKUNCI yang dipakai run resmi. "
-              "Run eksplorasi dapat mengubahnya.",
-        "en": "The values above are the LOCKED parameters used by official "
-              "runs. Exploration runs may change them."},
+        "id": "Nilai di atas adalah parameter TERKUNCI, sesuai paper rujukan. "
+              "Run kustom dapat mengubahnya.",
+        "en": "The values above are the LOCKED parameters, matching the "
+              "reference paper. Custom runs may change them."},
     "re.note_follows_pipeline": {
         "id": "Mengikuti research pipeline, bukan algoritmanya.",
         "en": "Follows the research pipeline, not the algorithm."},
@@ -707,8 +707,8 @@ CATALOG: dict[str, dict[str, str]] = {
                               "en": "the preprocessing steps will not be readable in the catalogue or the report."},
     "ap.cost_feature_selection": {"id": "keterangan seleksi fitur tidak terbaca di katalog maupun laporan.",
                                   "en": "the feature selection note will not be readable in the catalogue or the report."},
-    "ap.cost_fixed_params": {"id": "**tidak ada satu pun parameter yang tampil**: transparansi hyperparameter hilang, dan mode eksplorasi tidak dapat dipakai sama sekali.",
-                             "en": "**no parameter will be shown at all**: hyperparameter transparency is lost, and exploration mode cannot be used."},
+    "ap.cost_fixed_params": {"id": "**tidak ada satu pun parameter yang tampil**: transparansi hyperparameter hilang, dan mode kustom tidak dapat dipakai sama sekali.",
+                             "en": "**no parameter will be shown at all**: hyperparameter transparency is lost, and custom mode cannot be used."},
     "ap.cost_train_test_split": {"id": "pembagian train/test tidak terbaca di katalog maupun laporan.",
                                  "en": "the train/test split will not be readable in the catalogue or the report."},
     # Kunci OPSIONAL: ditawarkan, tidak dituntut. Kalimatnya menyebut apa yang
@@ -1073,9 +1073,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Metrics do not mean the same thing across pipeline families: "
               "compare only within one family."},
     "vc.run_mode_note": {
-        "id": "Run resmi memakai parameter terkunci; run eksplorasi boleh "
+        "id": "Run terkunci memakai parameter paper rujukan; run kustom boleh "
               "mengubahnya, jadi keduanya tidak sebanding langsung.",
-        "en": "Official runs use locked parameters; exploration runs may "
+        "en": "Locked runs use the reference paper's parameters; custom runs may "
               "change them, so the two are not directly comparable."},
     "vc.old_versions_kept": {
         "id": "Versi lama tetap tersimpan: eksperimen terdahulu tetap "
@@ -1170,14 +1170,14 @@ CATALOG: dict[str, dict[str, str]] = {
     "rpt.lbl_run_mode": {"id": "Mode eksekusi", "en": "Run mode"},
     "rpt.lbl_generated": {"id": "Dibuat pada", "en": "Generated at"},
     "rpt.note_official": {
-        "id": "Run resmi: memakai parameter terkunci pipeline.",
-        "en": "Official run: uses the pipeline's locked parameters."},
+        "id": "Run terkunci: memakai parameter terkunci pipeline.",
+        "en": "Locked run: uses the pipeline's locked parameters."},
     "rpt.note_exploration": {
-        "id": "Run eksplorasi: parameter diubah dari nilai terkunci, jadi "
-              "hasilnya tidak sebanding langsung dengan run resmi.",
-        "en": "Exploration run: parameters were changed from the locked "
+        "id": "Run kustom: parameter diubah dari nilai terkunci, jadi "
+              "hasilnya tidak sebanding langsung dengan run terkunci.",
+        "en": "Custom run: parameters were changed from the locked "
               "values, so the result is not directly comparable to an "
-              "official run."},
+              "locked run."},
     "rpt.note_reproducibility": {
         "id": "Seed tetap dan parameter tercatat, sehingga eksperimen ini "
               "dapat dijalankan ulang dengan hasil yang sama.",
@@ -1340,10 +1340,10 @@ CATALOG: dict[str, dict[str, str]] = {
     # ── Mode eksekusi: label, lencana, petunjuk  (Tahap 3A) ──────────────
     # Konstanta di orchestrator/run_mode.py TIDAK diubah — ia nilai bawaan
     # yang diimpor & diuji test lama. Yang ditambahkan hanya terjemahannya.
-    "mode.official_label": {"id": "Run resmi", "en": "Official run"},
-    "mode.exploration_label": {"id": "Run eksplorasi", "en": "Exploration run"},
-    "mode.official_badge": {"id": "🔒 Resmi", "en": "🔒 Official"},
-    "mode.exploration_badge": {"id": "🧪 Eksplorasi", "en": "🧪 Exploration"},
+    "mode.official_label": {"id": "Run terkunci", "en": "Locked run"},
+    "mode.exploration_label": {"id": "Run kustom", "en": "Custom run"},
+    "mode.official_badge": {"id": "🔒 Terkunci", "en": "🔒 Locked"},
+    "mode.exploration_badge": {"id": "🧪 Kustom", "en": "🧪 Custom"},
     "mode.official_hint": {
         "id": "Parameter terkunci sesuai paper rujukan.",
         "en": "Parameters locked to match the reference paper."},
@@ -1630,7 +1630,7 @@ CATALOG: dict[str, dict[str, str]] = {
     #   "keterulangan" justru lebih sulit dikenali pembacanya.
 
     # ── Mode eksekusi pada laporan ───────────────────────────────────────
-    "rpt.exploration_badge": {"id": "Run eksplorasi.", "en": "Exploration run."},
+    "rpt.exploration_badge": {"id": "Run kustom.", "en": "Custom run."},
     "rpt.exploration_warning": {
         "id": "Parameter diubah dari nilai terkunci pipeline. Hasilnya TIDAK "
               "dipakai sebagai dasar replikasi paper rujukan maupun "
@@ -1690,8 +1690,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "ins.forbid_dataset": {
         "id": "Mengubah dataset asli.",
         "en": "Modifying the original dataset."},
-    "ins.forbid_params": {"id": "Mengubah hyperparameter terkunci sendiri saat berjalan. Penyesuaian hanya lewat run eksplorasi platform, yang mencatat & menandainya.",
-                          "en": "Changing its own locked hyperparameters at run time. Adjustments happen only through the platform's exploration run, which records and flags them."},
+    "ins.forbid_params": {"id": "Mengubah hyperparameter terkunci sendiri saat berjalan. Penyesuaian hanya lewat run kustom platform, yang mencatat & menandainya.",
+                          "en": "Changing its own locked hyperparameters at run time. Adjustments happen only through the platform's custom run, which records and flags them."},
     "ins.forbid_fit_test": {
         "id": "Fit praproses pada data uji.",
         "en": "Fitting preprocessing on the test data."},
@@ -2300,14 +2300,14 @@ CATALOG: dict[str, dict[str, str]] = {
         "id": "{seed} (terkunci untuk seluruh operasi stokastik)",
         "en": "{seed} (locked for every stochastic operation)"},
     "rpt.seed_adjusted": {
-        "id": "{seed} (disesuaikan pada run eksplorasi; nilai terkunci {base})",
-        "en": "{seed} (adjusted in an exploration run; locked value {base})"},
+        "id": "{seed} (disesuaikan pada run kustom; nilai terkunci {base})",
+        "en": "{seed} (adjusted in a custom run; locked value {base})"},
     "rpt.repro_exploration": {
-        "id": "Eksperimen ini adalah <b>run eksplorasi</b>: dapat diulang "
+        "id": "Eksperimen ini adalah <b>run kustom</b>: dapat diulang "
               "dengan parameter yang tercantum pada Tabel Konfigurasi, tetapi "
               "TIDAK dipakai sebagai dasar replikasi paper rujukan maupun "
               "perbandingan resmi antar pipeline.",
-        "en": "This experiment is an <b>exploration run</b>: it can be "
+        "en": "This experiment is a <b>custom run</b>: it can be "
               "repeated with the parameters listed in the Configuration "
               "table, but it is NOT used as a basis for replicating the "
               "reference paper, nor for official comparison between "
@@ -2775,11 +2775,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Parameters recorded while the experiment was running."},
     "rpt.params_caption_used_changed": {
         "id": "Parameter tercatat saat eksperimen berjalan; nilai bertanda * "
-              "disesuaikan pengguna pada run eksplorasi, sehingga hasil ini "
-              "TIDAK sebanding dengan run resmi.",
+              "disesuaikan pengguna pada run kustom, sehingga hasil ini "
+              "TIDAK sebanding dengan run terkunci.",
         "en": "Parameters recorded while the experiment was running; values "
-              "marked * were adjusted by the user on an exploration run, so "
-              "these results are NOT comparable with an official run."},
+              "marked * were adjusted by the user on a custom run, so "
+              "these results are NOT comparable with a locked run."},
     "rpt.params_heading_locked": {
         "id": "Hyperparameter terkunci (paper-faithful), disertai split & "
               "seed:",
@@ -3237,11 +3237,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Path to the raw file, for pipelines that read the file "
               "themselves."},
     "ins.fld_param_overrides": {
-        "id": "Penyesuaian hyperparameter untuk run eksplorasi; KOSONG pada "
-              "run resmi. Isinya hanya kunci yang ada di `fixed_params` dan "
+        "id": "Penyesuaian hyperparameter untuk run kustom; KOSONG pada "
+              "run terkunci. Isinya hanya kunci yang ada di `fixed_params` dan "
               "sudah divalidasi orchestrator.",
-        "en": "Hyperparameter adjustments for an exploration run; EMPTY on an "
-              "official run. It holds only keys that exist in `fixed_params`, "
+        "en": "Hyperparameter adjustments for a custom run; EMPTY on a "
+              "locked run. It holds only keys that exist in `fixed_params`, "
               "already validated by the orchestrator."},
     "ins.fld_accuracy": {"id": "Akurasi keseluruhan.",
                          "en": "Overall accuracy."},
@@ -3590,12 +3590,12 @@ CATALOG: dict[str, dict[str, str]] = {
                                    "en": "The selected experiments ran on datasets with different hashes: their numbers come from data that is not the same."},
     "ps.param_provenance": {"id": "Parameter bertanda ✓ direkam saat eksperimen itu berjalan; sisanya dibaca dari definisi pipeline (get_info → fixed_params) pada kode saat ini, karena eksperimen lama belum mencatat parameternya.",
                            "en": "Parameters marked ✓ were recorded while that experiment ran; the rest are read from the pipeline definition (get_info → fixed_params) in the current code, because older experiments did not record theirs yet."},
-    "ps.mode_column_note": {"id": "Kolom Mode: 🔒 Resmi = parameter terkunci, dasar perbandingan & replikasi; 🧪 Eksplorasi = parameter disesuaikan, di luar perbandingan resmi.",
-                           "en": "The Mode column: 🔒 Official = parameters locked, the basis for comparison & replication; 🧪 Exploration = parameters adjusted, outside the official comparison."},
+    "ps.mode_column_note": {"id": "Kolom Mode: 🔒 Terkunci = parameter sesuai paper rujukan, dasar perbandingan & replikasi; 🧪 Kustom = parameter disesuaikan, di luar perbandingan resmi.",
+                           "en": "The Mode column: 🔒 Locked = parameters match the reference paper, the basis for comparison & replication; 🧪 Custom = parameters adjusted, outside the official comparison."},
     "ps.best_mark_note": {"id": "Nilai tertinggi disorot per kolom DI DALAM keluarga pipeline masing-masing, bukan peringkat lintas keluarga.",
                          "en": "The highest value is highlighted per column WITHIN each pipeline family: it is not a ranking across families."},
-    "ps.mode_filter_default_note": {"id": "Bawaan menampilkan SEMUA mode: run eksplorasi tidak disembunyikan, hanya ditandai.",
-                                   "en": "The default shows ALL modes: exploration runs are not hidden, only marked."},
+    "ps.mode_filter_default_note": {"id": "Bawaan menampilkan SEMUA mode: run kustom tidak disembunyikan, hanya ditandai.",
+                                   "en": "The default shows ALL modes: custom runs are not hidden, only marked."},
     "ps.result_summary": {"id": "{shown} dari {total} eksperimen",
                          "en": "{shown} of {total} experiments"},
     "ps.expr_help": {"id": "Contoh: `f1 > 0.8`, `accuracy >= 0.9 and auc > 0.85`. Nama yang dikenal: {names}.",
@@ -3617,8 +3617,8 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Peringatan campuran mode eksekusi ───────────────────────────────────────
-    "ps.mixed_mode_warning": {"id": "Pilihan ini mencampur run resmi (parameter terkunci) dengan run eksplorasi (parameter disesuaikan). Keduanya TIDAK sebanding: perbedaan angka bisa berasal dari perbedaan parameter, bukan dari pipeline-nya.",
-                             "en": "This selection mixes official runs (locked parameters) with exploration runs (adjusted parameters). The two are NOT comparable: a difference in the numbers may come from the parameters rather than from the pipeline itself."},
+    "ps.mixed_mode_warning": {"id": "Pilihan ini mencampur run terkunci dengan run kustom (parameter disesuaikan). Keduanya TIDAK sebanding: perbedaan angka bisa berasal dari perbedaan parameter, bukan dari pipeline-nya.",
+                             "en": "This selection mixes locked runs with custom runs (adjusted parameters). The two are NOT comparable: a difference in the numbers may come from the parameters rather than from the pipeline itself."},
 
 
     # ── Progress & Status: halaman & dialog ───────────────────────────────────────
