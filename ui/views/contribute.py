@@ -3538,6 +3538,15 @@ _MY_EDIT_KEY = "_contrib_my_edit"
 _MY_STATUS_STATE = {"pending": "warn", "approved": "ok", "rejected": "bad"}
 
 
+#: Kolom daftar "Pengajuan saya": (kunci judul, bobot lebar).
+_MY_COLS = (
+    ("ap.col_my_submission", 7),
+    ("ap.col_submitted_at", 4),
+    ("ap.col_approved_at", 4),
+    ("ap.col_status", 3),
+    ("", 6),
+)
+
 #: Pengalih bagian halaman Unggah Pipeline: unggah baru, atau pengajuan sendiri.
 _PIPE_SECTION_KEY = "contrib_pipe_section"
 _PIPE_SECTION_LAST = "_contrib_pipe_section_last"
@@ -3591,25 +3600,43 @@ def _render_my_submissions(user: dict) -> None:
     by_id = {i["id"]: i for i in items}
     rows = sr.my_submission_rows(items, user.get("username"))
 
+    # Kepala kolom, dengan pola baris yang sama dengan tabel lain di halaman
+    # ini. Di layar sempit tiap baris menjadi kartu dan selnya membawa label.
+    lebar = [b for _, b in _MY_COLS]
+    mobile_card_labels("ids-my-row", card_labels(_MY_COLS, skip=()))
+    with st.container():
+        st.markdown('<span class="ids-queue-head ids-mcard-head"></span>',
+                    unsafe_allow_html=True)
+        kepala = st.columns(lebar, vertical_alignment="center")
+        for kol, (kunci, _) in zip(kepala, _MY_COLS):
+            kol.markdown(f"**{t(kunci)}**" if kunci else "")
+
     for row in rows:
         item = by_id.get(row["id"]) or {}
         sid = row["id"]
         with st.container(border=True):
-            sel = st.columns([6, 2, 2, 2], vertical_alignment="center")
+            st.markdown('<span class="ids-queue-row ids-mcard ids-my-row"></span>',
+                        unsafe_allow_html=True)
+            sel = st.columns(lebar, vertical_alignment="center")
             sel[0].markdown(
                 # HTML, bukan `**…**`: nama berakhiran spasi membuat tanda
                 # tebal markdown tidak tertutup dan tampil apa adanya.
                 f"<strong>{escape(str(row['name'] or '-').strip())}</strong>"
-                f'<span class="ids-row-sub">'
-                f"{escape(t('ap.my_submitted', number=sid, when=human_datetime(row['submitted_at'])))}"
-                "</span>", unsafe_allow_html=True)
-            sel[1].markdown(grid.state_badge(
+                f'<span class="ids-row-sub">#{sid}</span>',
+                unsafe_allow_html=True)
+            sel[1].markdown(escape(human_datetime(row["submitted_at"]) or "-"))
+            # Tanggal disetujui hanya ada pada yang DISETUJUI. Yang ditolak juga
+            # punya tanggal keputusan, tetapi itu bukan tanggal disetujui.
+            sel[2].markdown(escape(human_datetime(row["reviewed_at"]) or "-")
+                            if row["status"] == "approved" else "-")
+            sel[3].markdown(grid.state_badge(
                 sr.status_label(row["status"]),
                 _MY_STATUS_STATE.get(row["status"], "warn")),
                 unsafe_allow_html=True)
 
+            aksi = sel[4].columns(2)
             sunting = revision_blocker(item)
-            if sel[2].button(t("ap.btn_edit_submission"), key=f"my_edit_{sid}",
+            if aksi[0].button(t("ap.btn_edit_submission"), key=f"my_edit_{sid}",
                              use_container_width=True, disabled=bool(sunting),
                              help=t(sunting) if sunting else None):
                 st.session_state[_MY_EDIT_KEY] = sid
@@ -3617,7 +3644,7 @@ def _render_my_submissions(user: dict) -> None:
                 st.session_state.pop(_CONFIRM_DEL_SUB_KEY, None)
                 st.rerun()
             hapus = withdraw_blocker(item, user)
-            if sel[3].button(t("ap.btn_withdraw"), key=f"my_del_{sid}",
+            if aksi[1].button(t("ap.btn_withdraw"), key=f"my_del_{sid}",
                              use_container_width=True, disabled=bool(hapus),
                              help=t(hapus) if hapus else None):
                 st.session_state[_CONFIRM_DEL_SUB_KEY] = sid

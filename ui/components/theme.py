@@ -700,7 +700,10 @@ div[data-testid="stVerticalBlock"]:has(> .stElementContainer .ids-progress-page)
 }}
 .st-key-contrib_pipe_section [data-testid="{SEG_GROUP}"] button {{
     border-radius: 0;
-    padding: .35rem .1rem;
+    /* Jarak antartab dipasang PADA tombolnya: tombol-tombol itu tidak selalu
+       anak langsung wadahnya, jadi `gap` pada wadah tidak sampai ke sana. */
+    padding: .35rem .25rem;
+    margin-right: 1.75rem;
     margin-bottom: -1px;                 /* garis aktif menimpa garis dasar */
     border-bottom: 2px solid transparent;
     box-shadow: none;

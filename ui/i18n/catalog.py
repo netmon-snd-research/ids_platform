@@ -769,12 +769,8 @@ CATALOG: dict[str, dict[str, str]] = {
     # Penghapusan eksperimen. Alasannya selalu DINYATAKAN: tombol mati tanpa
     # keterangan membuat orang menebak apa yang salah.
     "err.run_too_many_active": {
-        "id": "Anda sudah punya eksperimen yang mengantre atau berjalan. "
-              "Tunggu salah satunya selesai lebih dulu. Worker mengerjakan "
-              "satu per satu, jadi menambah antrean tidak mempercepat apa pun.",
-        "en": "You already have experiments queued or running. Wait for one "
-              "to finish first. The worker handles them one at a time, so "
-              "adding to the queue speeds nothing up."},
+        "id": "Batas eksperimen aktif Anda tercapai. Tunggu salah satunya selesai.",
+        "en": "You have reached your active experiment limit. Wait for one to finish."},
     "err.run_rate_limited": {
         "id": "Terlalu banyak eksperimen dimulai dalam waktu singkat. "
               "Tunggu beberapa menit lalu coba lagi.",
@@ -1812,6 +1808,10 @@ CATALOG: dict[str, dict[str, str]] = {
     "ap.sec_my_submissions": {"id": "Pengajuan saya ({count})",
                               "en": "My submissions ({count})"},
     "ap.tab_new_upload": {"id": "Unggah baru", "en": "New upload"},
+    "ap.col_my_submission": {"id": "Pengajuan", "en": "Submission"},
+    "ap.col_submitted_at": {"id": "Diajukan", "en": "Submitted"},
+    "ap.col_approved_at": {"id": "Disetujui", "en": "Approved"},
+    "ap.col_status": {"id": "Status", "en": "Status"},
     "ap.my_none": {"id": "Belum ada pengajuan pipeline.",
                    "en": "No pipeline submissions yet."},
     "ap.my_submitted": {"id": "#{number} · diajukan {when}",
