@@ -502,7 +502,11 @@ def _diagnose_csv_type(dataset_type: str, schema: dict,
 
     # Reuse the existing schema verdict on the (capped) sample — same rules the
     # platform validates with, no second definition of "missing column".
-    result = validate_dataset(df.head(100), dataset_type)
+    # Skemanya DISODORKAN, bukan dicari ulang. `validate_dataset` sendiri hanya
+    # mengenal skema statis, jadi tanpa ini research kontribusi selalu terbaca
+    # "tidak ada kolom yang hilang": berkas yang kehilangan kolom fitur
+    # dinyatakan cocok, lalu gagal di worker.
+    result = validate_dataset(df.head(100), dataset_type, schema=schema)
     missing = list(result.missing_columns)
 
     checks = [fmt]

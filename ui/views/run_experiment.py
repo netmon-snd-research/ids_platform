@@ -1833,6 +1833,10 @@ def _cause_sentence(diag: dict, dataset_type: str, result: dict) -> str:
             return t("dx.cause_ok_with_notes", count=len(warns))
         return t("dx.cause_ok")
 
+    unlabeled = _unlabeled_fit(result)
+    if unlabeled:
+        return t("dx.cause_unlabeled", **unlabeled)
+
     if failure["key"] == "format":
         names = {"csv": "CSV", "ndjson": "NDJSON"}
         want = names.get(required_format(dataset_type), "?")
@@ -1860,11 +1864,36 @@ def _cause_sentence(diag: dict, dataset_type: str, result: dict) -> str:
     return failure["message"]
 
 
+def _unlabeled_fit(result: dict) -> dict | None:
+    """Kolom fitur LENGKAP, hanya kolom label yang tidak ada; selain itu None.
+
+    Itu bukan "format salah", melainkan data TANPA LABEL, misalnya test set
+    kompetisi yang labelnya disimpan penyelenggara. Pipeline platform melatih
+    dan mengevaluasi terhadap label, jadi berkas seperti ini memang tidak dapat
+    dijalankan. Putusannya tetap "tidak cocok"; yang berbeda hanya kalimatnya,
+    supaya pengguna tahu datanya benar, hanya jenisnya yang lain.
+
+    Mengembalikan ``{"column", "features"}`` untuk disisipkan ke kalimatnya.
+    """
+    by_key = _checks_by_key(result)
+    label = by_key.get("label") or {}
+    fitur = by_key.get("features") or {}
+    if label.get("status") != "fail" or label.get("msg_key") != "dx.label_missing":
+        return None
+    if fitur.get("status") != "pass" or (by_key.get("format") or {}).get("status") != "pass":
+        return None
+    return {"column": (label.get("values") or {}).get("column") or "label",
+            "features": (fitur.get("values") or {}).get("count") or "-"}
+
+
 def _action_sentence(dataset_type: str, result: dict) -> str:
     """Kalimat "Agar cocok…" untuk kegagalan utama; "" bila tidak ada kegagalan."""
     failure = _primary_failure(result)
     if failure is None:
         return ""
+    unlabeled = _unlabeled_fit(result)
+    if unlabeled:
+        return t("dx.action_unlabeled", **unlabeled)
     hint = (_ACTION_HINTS.get(failure["key"]) or {}).get(dataset_type)
     return f"**Agar cocok:** {hint}" if hint else ""
 
@@ -2053,8 +2082,10 @@ def _render_compat_boxes(diag: dict) -> None:
         st.warning(diag.get("error") or "Diagnosa kecocokan tidak tersedia.")
         return
 
-    # Teks biasa, bukan kotak peringatan: daftar di bawahnya yang menuntun.
-    st.markdown(t("re.msg_no_auto_match"))
+    # Kotak merah: dataset terpilih tidak dapat dijalankan dengan research mana
+    # pun, dan itu harus terbaca sekilas. Daftar di bawahnya tetap yang
+    # menuntun ke sebabnya lewat "Uji kompatibilitas".
+    st.error(t("re.msg_no_auto_match"))
     try:
         katalog = {r["dataset_type"]: r for r in catalog_rows()}
     except Exception:                       # pragma: no cover - defensif
