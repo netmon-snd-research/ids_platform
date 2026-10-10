@@ -539,3 +539,183 @@ def save_to_staging(source: str, filename: str, *, user: dict | None) -> Path:
     target = STAGING_DIR / safe
     target.write_text(source, encoding="utf-8")
     return target
+
+
+# ── Notebook (.ipynb) ─────────────────────────────────────────────────────
+# Notebook diterima sebagai SUMBER, bukan sebagai format yang disimpan. Ia
+# diubah menjadi teks `.py` di sini, lalu menempuh jalur yang sama persis
+# dengan berkas `.py`: validasi AST, hash, penyimpanan, dan pemuat paket — yang
+# memang hanya dapat mengimpor `.py`. Satu jalur berarti satu set aturan
+# keamanan; jalur kedua khusus notebook akan menjadi tempat aturan tertinggal.
+#
+# ⚠️ Konversinya STATIS: JSON notebook dibaca, sel kode digabung. Tidak ada
+# kernel, tidak ada `nbconvert`, tidak ada sel yang dijalankan. Output dan sel
+# markdown dibuang, karena output dapat berukuran megabyte dan tidak pernah
+# dibutuhkan pipeline.
+
+NOTEBOOK_SUFFIX = ".ipynb"
+
+#: Notebook membawa output (gambar base64, tabel), jadi jauh lebih besar dari
+#: kodenya. Batas ini untuk JSON mentahnya; hasil konversinya tetap tunduk pada
+#: MAX_UPLOAD_BYTES seperti berkas `.py` lain.
+MAX_NOTEBOOK_BYTES = 20_000_000       # 20 MB
+
+#: Baris khas IPython yang bukan Python: magic (`%matplotlib inline`,
+#: `%%time`) dan perintah shell (`!pip install …`, `files = !ls`).
+_IPY_LINE = re.compile(r"^\s*(%|!)|^\s*[A-Za-z_][\w.]*\s*=\s*[!%]")
+
+#: Magic sel yang isinya tetap Python biasa; hanya baris magic-nya yang
+#: dijadikan komentar.
+_WRAPPING_CELL_MAGICS = frozenset({"time", "timeit", "capture", "prun"})
+
+#: Pernyataan tingkat atas yang hanya MENDEFINISIKAN sesuatu. Sisanya dijalankan
+#: saat modul dimuat — pada notebook, itu biasanya seluruh pelatihan.
+_DEFINING_NODES = (ast.Import, ast.ImportFrom, ast.FunctionDef,
+                   ast.AsyncFunctionDef, ast.ClassDef)
+
+
+class NotebookError(ValueError):
+    """Berkas `.ipynb` tidak dapat dibaca sebagai notebook."""
+
+
+def _cell_text(cell: dict) -> str:
+    raw = cell.get("source", cell.get("input", ""))
+    return "".join(raw) if isinstance(raw, list) else str(raw or "")
+
+
+def _notebook_cells(nb: dict) -> list[dict]:
+    if isinstance(nb.get("cells"), list):                    # nbformat 4
+        return nb["cells"]
+    sheets = nb.get("worksheets")                            # nbformat 3
+    if isinstance(sheets, list) and sheets and isinstance(sheets[0], dict):
+        return sheets[0].get("cells") or []
+    raise NotebookError("Struktur notebook tidak dikenali (tidak ada daftar sel).")
+
+
+def _runs_at_import(node: ast.AST) -> bool:
+    """Apakah pernyataan tingkat atas ini MENJALANKAN sesuatu saat diimpor."""
+    if isinstance(node, _DEFINING_NODES):
+        return False
+    if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)):
+        return False                                         # docstring
+    if isinstance(node, (ast.Assign, ast.AnnAssign)):
+        # Konstanta (`TEST_SIZE = 0.3`) sah; `df = pd.read_csv(...)` tidak.
+        return any(isinstance(n, ast.Call) for n in ast.walk(node))
+    return True
+
+
+def notebook_to_source(data: bytes, filename: str = "") -> dict:
+    """Ubah bytes `.ipynb` menjadi source `.py`. MURNI dan STATIS.
+
+    Mengembalikan ``{name, source, code_cells, disabled_lines, runs_at_import,
+    notes}``. ``name`` adalah nama berkas `.py` hasilnya (stem yang sama).
+    Baris magic/shell IPython dijadikan komentar, bukan dibuang, supaya
+    kontributor dapat melihat apa yang tidak ikut dijalankan.
+
+    Raise ``NotebookError`` bila berkasnya bukan notebook yang dapat dibaca.
+    """
+    import json
+
+    if len(data) > MAX_NOTEBOOK_BYTES:
+        raise NotebookError(
+            f"Notebook berukuran {len(data):,} byte, melebihi batas "
+            f"{MAX_NOTEBOOK_BYTES:,} byte. Hapus output sel lalu unggah ulang.")
+    try:
+        nb = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as e:
+        raise NotebookError(f"Berkas bukan notebook JSON yang valid: {e}") from e
+    if not isinstance(nb, dict):
+        raise NotebookError("Berkas bukan notebook JSON yang valid.")
+
+    stem = Path(filename or "notebook.ipynb").stem
+    code_cells = [c for c in _notebook_cells(nb)
+                  if isinstance(c, dict) and c.get("cell_type") == "code"]
+
+    disabled = 0
+    parts = [f"# Dikonversi dari {stem}{NOTEBOOK_SUFFIX}: {len(code_cells)} sel kode.\n"
+             f"# Sel markdown dan output tidak disertakan.\n"]
+    for i, cell in enumerate(code_cells, 1):
+        lines = _cell_text(cell).splitlines()
+        if not any(line.strip() for line in lines):
+            continue
+        # Magic sel yang hanya MEMBUNGKUS (`%%time`) menyisakan isi Python
+        # yang sah; yang MENGGANTI bahasa sel (`%%bash`, `%%writefile`)
+        # menjadikan seluruh isinya bukan Python, jadi ikut dinonaktifkan.
+        first = lines[0].strip() if lines else ""
+        cell_magic = (first.startswith("%%")
+                      and first[2:].split(" ")[0] not in _WRAPPING_CELL_MAGICS)
+        out = []
+        for line in lines:
+            if cell_magic or _IPY_LINE.match(line):
+                out.append(f"# [ipynb, dinonaktifkan] {line}")
+                disabled += 1
+            else:
+                out.append(line)
+        parts.append(f"\n# %% sel {i}\n" + "\n".join(out) + "\n")
+    source = "".join(parts)
+
+    runs = 0
+    try:
+        runs = sum(_runs_at_import(n) for n in ast.parse(source).body)
+    except (SyntaxError, ValueError, RecursionError):
+        pass        # validator yang melaporkan sintaksnya, dengan nomor baris
+
+    notes = []
+    if disabled:
+        notes.append(f"{disabled} baris magic/shell IPython dijadikan komentar "
+                     f"dan tidak akan dijalankan.")
+    if runs:
+        notes.append(f"{runs} pernyataan tingkat atas akan DIJALANKAN saat modul "
+                     f"dimuat (misalnya membaca data atau melatih model). Pindahkan "
+                     f"ke dalam `run()`: pipeline hanya boleh bekerja di sana.")
+    return {"name": f"{stem}.py", "source": source, "code_cells": len(code_cells),
+            "disabled_lines": disabled, "runs_at_import": runs, "notes": notes}
+
+
+class ConvertedUpload:
+    """Hasil konversi yang berperilaku seperti berkas unggahan `.py`.
+
+    Halaman unggah membaca ``.name`` dan ``.getvalue()`` di banyak tempat
+    (deteksi algoritma, fase, ukuran, validasi paket, pengajuan). Membungkus
+    hasilnya di sini membuat semua tempat itu menerima notebook tanpa satu
+    pun diubah.
+    """
+
+    def __init__(self, converted: dict, original_name: str):
+        self.name = converted["name"]
+        self.original_name = original_name
+        self.notes = list(converted.get("notes") or [])
+        self.code_cells = converted.get("code_cells", 0)
+        self._data = converted["source"].encode("utf-8")
+
+    def getvalue(self) -> bytes:
+        return self._data
+
+
+def normalize_pipeline_uploads(uploaded) -> tuple[list, list[str]]:
+    """Ubah setiap `.ipynb` di antara unggahan menjadi ``ConvertedUpload``.
+
+    Mengembalikan ``(berkas, galat)``. Berkas `.py` dilewatkan apa adanya.
+    Notebook yang tidak terbaca, atau yang namanya bertabrakan dengan berkas
+    `.py` di paket yang sama, tidak ikut dan dijelaskan di ``galat``.
+    """
+    files, errors = [], []
+    names = {f.name for f in (uploaded or [])
+             if not str(f.name).lower().endswith(NOTEBOOK_SUFFIX)}
+    for f in uploaded or []:
+        if not str(f.name).lower().endswith(NOTEBOOK_SUFFIX):
+            files.append(f)
+            continue
+        try:
+            converted = notebook_to_source(f.getvalue(), f.name)
+        except NotebookError as e:
+            errors.append(f"`{f.name}`: {e}")
+            continue
+        if converted["name"] in names:
+            errors.append(f"`{f.name}` menjadi `{converted['name']}`, yang juga "
+                          f"diunggah sebagai berkas `.py`. Unggah salah satunya saja.")
+            continue
+        names.add(converted["name"])
+        files.append(ConvertedUpload(converted, f.name))
+    return files, errors

@@ -37,7 +37,9 @@ from database.models import (
     ALL_KINDS, KIND_DATASET, KIND_PIPELINE, SUBMISSION_APPROVED,
     SUBMISSION_PENDING, SUBMISSION_REJECTED,
 )
-from orchestrator.auth_service import AuthError, require_approve, require_upload
+from orchestrator.auth_service import (
+    AuthError, PermissionDenied, require_approve, require_upload,
+)
 from utils.timestamps import now_iso
 
 logger = logging.getLogger(__name__)
@@ -1272,9 +1274,12 @@ def _dataset_is_bound_to_research(submission_id: int, db_path: str | None) -> bo
 
 def delete_submission(submission_id: int, *, actor: dict | None,
                       db_path: str | None = None) -> dict:
-    """Hapus sebuah pengajuan beserta jejaknya. Hanya Research Admin.
+    """Hapus sebuah pengajuan beserta jejaknya.
 
-    Berlaku untuk SEMUA status. Menghapus pengajuan yang sudah DISETUJUI
+    Research Admin: semua status. Pengaju: hanya kirimannya sendiri yang
+    belum disetujui (`withdraw_blocker`).
+
+    Bagi Research Admin berlaku untuk SEMUA status. Menghapus yang sudah DISETUJUI
     membuat ``registered_pipelines.submission_id`` menggantung: pipeline yang
     terdaftar tetap berjalan, tetapi halaman peninjauannya kehilangan kartunya.
     Itu konsekuensi yang dipilih sadar, dan halaman pipeline mengatakannya apa
@@ -1286,9 +1291,15 @@ def delete_submission(submission_id: int, *, actor: dict | None,
     from database import trials as trial_db
     from orchestrator.trial_dataset_service import discard_attachment
 
-    require_approve(actor, db_path)
-
     item = get_submission(submission_id, db_path)
+    # Research Admin menghapus apa saja. Pengaju hanya menarik kirimannya
+    # sendiri yang BELUM disetujui (`withdraw_blocker`).
+    if not _require_owner_or_admin(item, actor, db_path):
+        blocked = withdraw_blocker(item, actor)
+        if blocked:
+            raise SubmissionError(
+                f"Pengajuan #{submission_id} tidak dapat dihapus.", key=blocked,
+                values={"number": submission_id})
     if item is None:
         raise SubmissionError(
             f"Pengajuan #{submission_id} tidak ditemukan.",
@@ -1582,6 +1593,53 @@ def revision_sources(entry: dict) -> list[tuple[str, str]]:
     return out
 
 
+def is_owner(item: dict | None, user: dict | None) -> bool:
+    """Apakah ``user`` yang mengajukan ``item``. Fungsi MURNI.
+
+    Dibandingkan dengan ``submitted_by``, kolom yang diisi platform dari
+    identitas yang sedang masuk saat mengajukan, bukan dari isian pengguna.
+    """
+    nama = str((user or {}).get("username") or "").strip()
+    return bool(nama) and str((item or {}).get("submitted_by") or "") == nama
+
+
+def _require_owner_or_admin(item: dict | None, actor: dict | None,
+                            db_path: str | None) -> bool:
+    """Izinkan Research Admin, ATAU pengaju sendiri dengan akun yang aktif.
+
+    Mengembalikan True bila yang lolos adalah Research Admin. Pengaju tetap
+    diperiksa ulang ke basis data (`require_upload`), jadi akun yang
+    dinonaktifkan tidak dapat lagi mengubah kirimannya walau sesinya hidup.
+    """
+    try:
+        require_approve(actor, db_path)
+        return True
+    except AuthError:
+        pass
+    require_upload(actor, db_path)
+    if not is_owner(item, actor):
+        raise PermissionDenied(
+            "Hanya pengaju atau Research Admin yang dapat mengubah pengajuan ini.",
+            key="err.denied_not_owner")
+    return False
+
+
+def withdraw_blocker(item: dict | None, user: dict | None) -> str:
+    """Alasan PENGAJU tidak dapat menghapus pengajuannya; ``""`` bila boleh.
+
+    Pengajuan yang sudah disetujui telah menjadi pipeline terdaftar yang
+    mungkin sedang dipakai orang lain, jadi penghapusannya tetap wewenang
+    Research Admin. Fungsi MURNI, dipakai tombol dan aksinya sekaligus.
+    """
+    if not item:
+        return "err.submission_not_found"
+    if not is_owner(item, user):
+        return "err.denied_not_owner"
+    if item.get("status") == SUBMISSION_APPROVED:
+        return "ap.withdraw_not_approved"
+    return ""
+
+
 def revision_blocker(item: dict) -> str:
     """Alasan pengajuan ini tidak dapat direvisi; ``""`` bila boleh.
 
@@ -1611,7 +1669,8 @@ def revise_submission(submission_id: int, files: list[tuple[str, str]],
 
     Urutannya sengaja begini, dan tiap langkah adalah pengaman:
 
-    1. **izin** — hanya Research Admin, ditegakkan di sini dan bukan di tombol;
+    1. **izin** — Research Admin, atau pengajunya sendiri, ditegakkan di sini
+       dan bukan di tombol;
     2. **keadaan** — hanya pengajuan pipeline yang masih `pending`;
     3. **catatan WAJIB** — peninjau mengubah kiriman orang lain, jadi alasannya
        tercatat bersama perbuatannya, bukan diingat-ingat;
@@ -1635,9 +1694,11 @@ def revise_submission(submission_id: int, files: list[tuple[str, str]],
         extract_registry_metadata, review_package,
     )
 
-    require_approve(actor, db_path)
-
+    # Research Admin, ATAU pengaju yang menyunting kirimannya sendiri selagi
+    # masih pending. Pengajuannya dibaca dulu: izin pengaju bergantung pada
+    # siapa pemilik barisnya.
     item = get_submission(submission_id, db_path)
+    _require_owner_or_admin(item, actor, db_path)
     blocked = revision_blocker(item)
     if blocked:
         raise SubmissionError(

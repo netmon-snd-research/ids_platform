@@ -60,6 +60,9 @@ STATE_TINT = {
     "ok": "rgba(46,160,67,.16)",
     "warn": "rgba(200,150,60,.20)",
     "bad": "rgba(200,70,70,.20)",
+    # Netral: keadaan yang bukan masalah, hanya tidak menyala (mis. research
+    # yang dinonaktifkan). Kuning "warn" akan membacanya sebagai peringatan.
+    "off": "rgba(127,127,127,.16)",
 }
 
 def state_badge(text: str, state: str) -> str:

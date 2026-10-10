@@ -281,6 +281,15 @@ CATALOG: dict[str, dict[str, str]] = {
     "re.ds_private": {"id": "🔒 Privat", "en": "🔒 Private"},
     "re.ds_private_of": {"id": "🔒 Privat · {owner}", "en": "🔒 Private · {owner}"},
     "re.btn_delete_dataset": {"id": "Hapus", "en": "Delete"},
+    "re.ds_bound_to": {"id": "Dataset research · {research}",
+                       "en": "Research dataset · {research}"},
+    "re.ds_bound_no_delete": {
+        "id": "Terikat ke research {research} dan dipakai seluruh algoritmanya, "
+              "jadi tidak dapat dihapus terpisah. Nonaktifkan research itu bila "
+              "tidak ingin dipakai lagi.",
+        "en": "Bound to the {research} research and used by all its algorithms, "
+              "so it cannot be deleted on its own. Deactivate that research if "
+              "it should no longer be used."},
     "re.ds_delete_confirm": {"id": "Hapus **{filename}** permanen?",
                              "en": "Permanently delete **{filename}**?"},
     "re.ds_delete_used": {
@@ -657,12 +666,12 @@ CATALOG: dict[str, dict[str, str]] = {
         "id": "Dilampirkan peninjau.",
         "en": "Attached by the reviewer."},
     "td.warn_standalone_needs_dataset": {
-        "id": "Research pipeline yang berdiri sendiri WAJIB membawa datasetnya. "
-              "Tanpa lampiran, pengajuan ini tidak dapat diuji coba dan karena "
-              "itu tidak dapat disetujui.",
-        "en": "A standalone research pipeline MUST bring its own dataset. "
-              "Without an attachment this submission cannot be trial-run, and "
-              "therefore cannot be approved."},
+        "id": "Lampirkan dataset uji dulu: research pipeline ini diuji coba "
+              "dengan datasetnya sendiri.",
+        "en": "Attach a trial dataset first: this research pipeline is "
+              "trial-run on its own dataset."},
+    "td.tag_required": {"id": "wajib", "en": "required"},
+    "td.tag_optional": {"id": "opsional", "en": "optional"},
     "ap.revision_plan": {
         "id": "Yang akan terjadi pada paket",
         "en": "What will happen to the package"},
@@ -1782,10 +1791,26 @@ CATALOG: dict[str, dict[str, str]] = {
               "registry muncul setelah paket valid.",
         "en": "Fix the ✖ items above, then upload again. The download and the "
               "registry snippet appear once the package is valid."},
-    "ap.msg_valid_not_active": {"id": "Paket valid. Pipeline **belum aktif**, menunggu aktivasi manual.",
-                                "en": "Package is valid. The pipeline is **not active yet**, it awaits manual activation."},
-    "ap.msg_submitted_n": {"id": "Diajukan sebagai pengajuan #{number}. Menunggu peninjauan Research Admin. Pipeline ini **belum** aktif dan belum dapat dijalankan.",
-                           "en": "Submitted as submission #{number}. Awaiting Research Admin review. This pipeline is **not** active and cannot be run yet."},
+    "ap.msg_valid_not_active": {"id": "Paket valid.",
+                                "en": "Package is valid."},
+    "ap.sec_my_submissions": {"id": "Pengajuan saya ({count})",
+                              "en": "My submissions ({count})"},
+    "ap.my_submitted": {"id": "#{number} · diajukan {when}",
+                        "en": "#{number} · submitted {when}"},
+    "ap.my_reject_reason": {"id": "Alasan ditolak: {note}",
+                            "en": "Rejection reason: {note}"},
+    "ap.btn_edit_submission": {"id": "Sunting", "en": "Edit"},
+    "ap.btn_withdraw": {"id": "Hapus", "en": "Delete"},
+    "ap.withdraw_not_approved": {
+        "id": "Pengajuan yang sudah disetujui hanya dapat dihapus Research Admin.",
+        "en": "An approved submission can only be deleted by a Research Admin."},
+    "err.denied_not_owner": {
+        "id": "Hanya pengaju atau Research Admin yang dapat mengubah pengajuan ini.",
+        "en": "Only the submitter or a Research Admin can change this submission."},
+    "ap.lbl_download_files": {"id": "Unduh berkas tervalidasi ({count})",
+                              "en": "Download validated files ({count})"},
+    "ap.msg_submitted_n": {"id": "Diajukan sebagai #{number}, menunggu peninjauan Research Admin.",
+                           "en": "Submitted as #{number}, awaiting Research Admin review."},
     "ap.step_place_files": {
         "id": "1. Letakkan berkas paket di `pipelines/<subdirektori riset>/`.",
         "en": "1. Place the package files in "
@@ -3768,6 +3793,12 @@ CATALOG: dict[str, dict[str, str]] = {
         "id": "Gagal pada tahap {stage}", "en": "Failed at stage {stage}"},
     "trial.detail_title": {
         "id": "Rincian uji coba {when}", "en": "Trial details {when}"},
+    "trial.badge_passed": {"id": "Berhasil", "en": "Passed"},
+    "trial.badge_failed": {"id": "Gagal · {stage}", "en": "Failed · {stage}"},
+    "trial.meta_line": {"id": "{dataset} · {rows} baris · {seconds} detik · oleh {who}",
+                        "en": "{dataset} · {rows} rows · {seconds} s · by {who}"},
+    "trial.shape_line": {"id": "{features} fitur · {classes} kelas ({names})",
+                         "en": "{features} features · {classes} classes ({names})"},
     "trial.no_trials_yet": {
         "id": "Pengajuan ini belum pernah diuji.",
         "en": "This submission has not been tested yet."},
@@ -3812,8 +3843,8 @@ CATALOG: dict[str, dict[str, str]] = {
 
 
     # ── Dataset uji lampiran (Tahap 2) ───────────────────────────────────────
-    "td.heading": {"id": "Dataset uji (opsional)",
-                  "en": "Trial dataset (optional)"},
+    "td.heading": {"id": "Dataset uji",
+                  "en": "Trial dataset"},
     "td.intro": {"id": "Lampirkan berkas contoh bila pipeline Anda memerlukan struktur data yang belum ada di platform. Berkas ini HANYA dipakai peninjau untuk menguji pipeline, tidak menjadi dataset platform, dan dihapus setelah keputusan diambil.",
                 "en": "Attach a sample file if your pipeline needs a data structure the platform does not have yet. It is used ONLY by the reviewer to test the pipeline, never becomes a platform dataset, and is deleted once a decision is made."},
     "td.limit_note": {"id": "Batas ukuran {limit}. Format: {formats}.",
@@ -3838,8 +3869,8 @@ CATALOG: dict[str, dict[str, str]] = {
                       "en": "Attached: {filename} · {size}"},
     "td.structure_heading": {"id": "Hasil pemeriksaan struktur",
                             "en": "Structure check result"},
-    "td.structure_none": {"id": "Struktur berkas ini tidak cocok dengan skema mana pun yang dikenal platform. Peninjau tetap dapat mencobanya: pipeline Anda mungkin memang membaca strukturnya sendiri.",
-                         "en": "This file's structure does not match any schema the platform knows. A reviewer can still try it: your pipeline may well read its own structure."},
+    "td.structure_none": {"id": "Strukturnya bukan skema bawaan platform; pipeline Anda yang membacanya.",
+                         "en": "Not a built-in platform schema; your pipeline reads it."},
     "td.compatible_with": {"id": "Cocok dengan {types}",
                           "en": "Matches {types}"},
     "td.source_platform": {"id": "Dataset platform",
@@ -4061,8 +4092,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "ap.lbl_revision_note": {"id": "Catatan revisi", "en": "Revision note"},
     "ap.ph_revision_note": {"id": "mis. menghapus panggilan subprocess pada helper.py",
                            "en": "e.g. removed the subprocess call in helper.py"},
-    "ap.help_revision_note": {"id": "Wajib. Anda mengubah kiriman orang lain, jadi alasannya tercatat bersama perubahannya.",
-                             "en": "Required. You are changing what someone else sent, so the reason is recorded alongside the change."},
+    "ap.help_revision_note": {"id": "Wajib. Alasan perubahan tercatat bersama perubahannya dan dibaca peninjau maupun pengaju.",
+                             "en": "Required. The reason is recorded alongside the change and read by both the reviewer and the submitter."},
     "ap.help_revision_incomplete": {"id": "Unggah berkasnya dan isi catatan revisi lebih dulu.",
                                    "en": "Upload the files and write the revision note first."},
     "ap.revise_not_text": {"id": "Ada berkas yang bukan teks UTF-8, jadi tidak dapat dibaca sebagai kode Python.",

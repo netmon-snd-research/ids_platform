@@ -72,7 +72,7 @@ from orchestrator.pipeline_validator import (
 from ui.components.pipeline_upload import (
     GROUP_SECURITY, GROUP_STRUCTURE, MAX_UPLOAD_BYTES, ROLE_ENTRY,
     ROLE_SUPPORT,
-    extract_registry_metadata,
+    extract_registry_metadata, normalize_pipeline_uploads,
     review_package, safe_staging_name, save_to_staging,
 )
 from ui.components.instructions import (
@@ -687,16 +687,28 @@ def _render_trial_metrics(metrics: dict) -> None:
     `sr.trial_metric_split`, fungsi murni, supaya isinya dapat diperiksa tanpa
     menjalankan Streamlit.
     """
+    from ui.components.sections import render_counts
+
     kotak, sisa = sr.trial_metric_split(metrics)
     if not kotak and not sisa:
         prose(t("trial.no_metrics"), key="trial_no_metrics")
         return
     if kotak:
-        kolom = st.columns(len(kotak))
-        for kol, (label, nilai) in zip(kolom, kotak):
-            kol.metric(label, f"{float(nilai):.4f}")
-    if sisa:
-        render_facts(sisa)
+        # Kotak angka yang SAMA dengan bagian Hasil: angka besar, label kecil.
+        # `st.metric` di empat kolom tergambar sebagai label dan angka berukuran
+        # hampir sama, sehingga tidak ada yang menonjol.
+        render_counts([(label, f"{float(nilai):.4f}") for label, nilai in kotak])
+    # Bentuk data (jumlah fitur, kelas) cukup satu baris kecil; ia keterangan
+    # tentang angka di atas, bukan angka yang setara dengannya.
+    bentuk = {nama: nilai for nama, nilai in sisa}
+    fitur, kelas = bentuk.pop("n_features", None), bentuk.pop("classes", None)
+    if fitur is not None or kelas is not None:
+        nama_kelas = (metrics or {}).get("classes") or []
+        st.caption(t("trial.shape_line", features=fitur or "-",
+                     classes=len(nama_kelas) if nama_kelas else "-",
+                     names=", ".join(str(k) for k in nama_kelas) or "-"))
+    if bentuk:
+        render_facts(list(bentuk.items()))
 
 
 def _approve_help(gate: str, reviewed: dict, item: dict | None = None) -> str:
@@ -1096,7 +1108,7 @@ def _render_trial_table(item: dict) -> None:
             # Uji cobanya tersapu petugas kebersihan sementara modal terbuka.
             dlg.close_dialog(dlg.TRIAL_DETAIL_KEY)
         else:
-            _trial_detail_dialog(dipilih)
+            _trial_detail_dialog(dipilih, item)
 
 
 def _trial_badge(row: dict, trial_stage) -> str:
@@ -1118,30 +1130,78 @@ def _trial_badge(row: dict, trial_stage) -> str:
             f'{escape(teks)}</span>')
 
 
+def _trial_algorithm(item: dict | None) -> str:
+    """Algoritma yang DIJALANKAN uji coba pengajuan ini.
+
+    Uji coba memuat satu titik masuk saja, yaitu ``entry_filename`` pada
+    metadata (lihat `trial_service._entry_from_submission`). Pada paket
+    berisi beberapa algoritma, tanpa nama ini peninjau tidak tahu algoritma
+    mana yang angkanya sedang ia baca.
+    """
+    meta = (item or {}).get("metadata") or {}
+    entry = meta.get("entry_filename") or ""
+    for algo in meta.get("algorithms") or []:
+        if isinstance(algo, dict) and algo.get("filename") == entry:
+            return str(algo.get("algorithm") or algo.get("class_name") or entry)
+    return str(meta.get("algorithm") or meta.get("entry_class") or entry or "")
+
+
+def _local_int(value) -> str:
+    """Bilangan bulat dengan pemisah ribuan menurut bahasa aktif."""
+    from ui.i18n.core import current_lang
+
+    try:
+        teks = f"{int(value):,}"
+    except (TypeError, ValueError):
+        return "-"
+    return teks.replace(",", ".") if current_lang() == "id" else teks
+
+
+def _local_seconds(value) -> str:
+    try:
+        teks = f"{float(value):.1f}"
+    except (TypeError, ValueError):
+        return "-"
+    from ui.i18n.core import current_lang
+    return teks.replace(".", ",") if current_lang() == "id" else teks
+
+
 @dlg.dialog_decorator(" ", dlg.TRIAL_DETAIL_KEY, width="large")
-def _trial_detail_dialog(row: dict) -> None:
-    """Rincian satu uji coba. TAMBAHAN atas barisnya, bukan penggantinya."""
-    st.markdown(f"**{t('trial.detail_title', when=human_datetime(row['at']))}**")
-    st.caption(t("trial.tested_by", who=row["by"], when=row["at"],
-                 dataset=row["dataset"] or "-"))
+def _trial_detail_dialog(row: dict, item: dict | None = None) -> None:
+    """Rincian satu uji coba. TAMBAHAN atas barisnya, bukan penggantinya.
+
+    Urutannya mengikuti yang dicari peninjau: berhasil atau tidak, algoritma
+    apa, lalu angkanya. Keterangan pelengkap (dataset, ukuran, durasi,
+    penguji) diringkas menjadi satu baris kecil.
+    """
+    from ui.components.validator_messages import (
+        trial_failure_message, trial_stage,
+    )
+
     if row["passed"]:
-        st.success(t("trial.result_passed",
-                     rows=row["rows_used"] or "-",
-                     seconds=row["duration_s"] or "-"))
+        pil = grid.state_badge(t("trial.badge_passed"), "ok")
+    else:
+        pil = grid.state_badge(t("trial.badge_failed",
+                                 stage=trial_stage(row["error_stage"]) or "-"),
+                               "bad")
+    algoritma = _trial_algorithm(item)
+    judul = " · ".join(b for b in (escape(algoritma),
+                                   escape(human_datetime(row["at"]))) if b)
+    st.markdown(f'{pil}&nbsp; <span style="font-weight:600;font-size:1.05rem">'
+                f'{judul}</span>', unsafe_allow_html=True)
+    st.caption(t("trial.meta_line", dataset=row["dataset"] or "-",
+                 rows=_local_int(row["rows_used"]),
+                 seconds=_local_seconds(row["duration_s"]),
+                 who=row["by"] or "-"))
+
+    if row["passed"]:
         _render_trial_metrics(row["metrics"])
     else:
-        from ui.components.validator_messages import (
-            trial_failure_message, trial_stage,
-        )
-
-        st.error(t("trial.result_failed",
-                   stage=trial_stage(row["error_stage"]) or "-"))
-        st.markdown(t("trial.failure_detail",
-                      kind=row["error_kind"] or "-",
-                      message=trial_failure_message(
-                          row["error_kind"], row["error_message"]) or "-"))
-    if st.button(t("action.close"), key="trial_detail_close",
-                 use_container_width=True):
+        st.error(t("trial.failure_detail",
+                   kind=row["error_kind"] or "-",
+                   message=trial_failure_message(
+                       row["error_kind"], row["error_message"]) or "-"))
+    if st.button(t("action.close"), key="trial_detail_close"):
         dlg.close_dialog(dlg.TRIAL_DETAIL_KEY)
         st.rerun()
 
@@ -1936,9 +1996,15 @@ def _render_revision_upload(item: dict, user: dict) -> None:
         st.markdown(t("ap.draft_pending", count=len(tertunda)))
 
     berkas = st.file_uploader(
-        t("ap.lbl_revision_files"), type=["py"], accept_multiple_files=True,
+        t("ap.lbl_revision_files"), type=["py", "ipynb"], accept_multiple_files=True,
         key=f"revise_files_{sid}", help=t("ap.help_revision_files"))
-    berkas = berkas or []
+    # Sama dengan unggahan baru: notebook menjadi `.py` sebelum dibaca apa pun.
+    berkas, nb_errors = normalize_pipeline_uploads(berkas or [])
+    for pesan in nb_errors:
+        st.error(pesan)
+    for f in berkas:
+        for catatan_nb in getattr(f, "notes", None) or []:
+            st.warning(f"`{f.name}` (dari `{f.original_name}`): {catatan_nb}")
 
     # Titik masuk DIDETEKSI, tidak ditanyakan: `review_package` sudah membaca
     # kelas turunan `BasePipeline` dari AST tiap berkas, jadi meminta peninjau
@@ -2995,13 +3061,16 @@ def _render_trial_dataset_form(wajib: bool = False) -> tuple[object, str]:
     )
 
     st.markdown(f"**{t('td.heading')}**")
-    if wajib:
-        st.warning(t("td.warn_standalone_needs_dataset"))
+    # Wajib atau tidak dinyatakan SATU kata pada labelnya. Dahulu judulnya
+    # berbunyi "(opsional)" sementara kotak peringatan tepat di bawahnya
+    # menyatakan WAJIB. Akibatnya ditegakkan pada tombol Ajukan, bukan
+    # diceritakan di sini.
+    tag = t("td.tag_required") if wajib else t("td.tag_optional")
     # Apa gunanya berkas ini dan batasnya menempel pada pengunggahnya, bukan
     # berdiri sebagai baris tersendiri di atasnya: yang bertanya "berkas apa?"
     # sedang menatap kontrol itu, dan di situlah jawabannya harus ada.
     picked = st.file_uploader(
-        t("td.lbl_file"), type=[s.lstrip(".") for s in DATASET_SUFFIXES],
+        f"{t('td.lbl_file')} ({tag})", type=[s.lstrip(".") for s in DATASET_SUFFIXES],
         accept_multiple_files=False, key="contrib_trial_dataset",
         help=t("td.intro") + " "
              + t("td.limit_note",
@@ -3037,21 +3106,23 @@ def _render_attachment_structure(upload) -> None:
 
     from orchestrator.trial_dataset_service import inspect_attachment
 
-    st.markdown(f"**{t('td.structure_heading')}**")
+    # SATU baris keterangan di bawah konfirmasi lampiran, bukan judul + kotak:
+    # pada research yang berdiri sendiri hasilnya hampir selalu "tidak
+    # dikenal", dan itu keadaan yang wajar, bukan sesuatu untuk ditonjolkan.
     tmp = _Path(tempfile.mkdtemp()) / (upload.name or "sample.csv")
     try:
         tmp.write_bytes(upload.getvalue())
         result = inspect_attachment(str(tmp))
     except Exception:                        # pragma: no cover - defensif
-        st.info(t("td.structure_none"))
+        st.caption(t("td.structure_none"))
         return
 
     # Struktur yang tidak dikenal BUKAN kegagalan: pipeline yang dilampiri
     # dataset seperti ini justru sering membaca strukturnya sendiri.
     matched = [r.get("dataset_type") for r in result.get("reports") or []
                if r.get("compatible")]
-    st.info(t("td.compatible_with", types=", ".join(matched)) if matched
-            else t("td.structure_none"))
+    st.caption(t("td.compatible_with", types=", ".join(matched)) if matched
+               else t("td.structure_none"))
 
 
 def _attach_trial_dataset(submission: dict, upload, note: str) -> None:
@@ -3221,20 +3292,23 @@ def _render_info_completeness(result: dict) -> None:
 def _render_valid_followup(result: dict, form: dict) -> None:
     """Unduh + cuplikan registry terisi metadata + panduan aktivasi manual."""
     st.divider()
-    st.info(t("ap.msg_valid_not_active"))
+    st.success(t("ap.msg_valid_not_active"))
     _render_info_completeness(result)
 
-    st.markdown("Unduh berkas tervalidasi")
-    cols = st.columns(min(3, len(result["files"])) or 1)
-    for i, item in enumerate(result["files"]):
-        cols[i % len(cols)].download_button(
-            f"⬇ {item['filename']}",
-            data=item["source"].encode("utf-8"),
-            file_name=safe_staging_name(item["filename"]) or "pipeline.py",
-            mime="text/x-python",
-            use_container_width=True,
-            key=f"contrib_dl_{item['filename']}",
-        )
+    # Unduhan jarang dibutuhkan (berkasnya milik pengunggah sendiri), jadi
+    # dilipat: empat tombol selebar halaman mendorong langkah berikutnya,
+    # yaitu dataset uji dan tombol Ajukan, jauh ke bawah.
+    with st.expander(t("ap.lbl_download_files", count=len(result["files"]))):
+        cols = st.columns(min(3, len(result["files"])) or 1)
+        for i, item in enumerate(result["files"]):
+            cols[i % len(cols)].download_button(
+                f"⬇ {item['filename']}",
+                data=item["source"].encode("utf-8"),
+                file_name=safe_staging_name(item["filename"]) or "pipeline.py",
+                mime="text/x-python",
+                use_container_width=True,
+                key=f"contrib_dl_{item['filename']}",
+            )
 
     user = current_user()
     entry_item = next(f for f in result["files"] if f["role"] == ROLE_ENTRY)
@@ -3256,12 +3330,17 @@ def _render_valid_followup(result: dict, form: dict) -> None:
         entry_files = [f for f in result["files"] if f["role"] == ROLE_ENTRY]
         nama_algoritma = _render_algorithm_names(entry_files)
 
-        trial_upload, trial_note = _render_trial_dataset_form(
-            wajib=bool((form or {}).get("declared_schema", {}).get(
-                "label_column")))
+        wajib_dataset = bool((form or {}).get("declared_schema", {}).get(
+            "label_column"))
+        trial_upload, trial_note = _render_trial_dataset_form(wajib=wajib_dataset)
+        # Pengajuan berdiri sendiri tanpa dataset tidak pernah dapat diuji
+        # coba, jadi tidak pernah dapat disetujui. Tombolnya ditahan di sini,
+        # alasannya menempel padanya, alih-alih paragraf peringatan di atas.
+        kurang_dataset = wajib_dataset and trial_upload is None
         if st.button(t("ap.btn_submit_review"), key="contrib_submit_pipeline",
-                     type="primary",
-                     help=t("ap.help_submit_review")):
+                     type="primary", disabled=kurang_dataset,
+                     help=(t("td.warn_standalone_needs_dataset") if kurang_dataset
+                           else t("ap.help_submit_review"))):
             # Nama kelas SETIAP entry point dibaca STATIS dari AST —
             # dibutuhkan peninjau untuk mendaftarkan pipeline saat menyetujui.
             # Satu paket boleh memuat BANYAK entry point: sebuah research
@@ -3315,9 +3394,8 @@ def _render_valid_followup(result: dict, form: dict) -> None:
                 _attach_trial_dataset(submission, trial_upload, trial_note)
                 st.success(t("ap.msg_submitted_n",
                                   number=submission["id"]))
-
-    if form.get("notes"):
-        st.markdown(f"Catatan pengunggah: {form['notes']}")
+    # Catatan pengunggah tidak lagi diulang di sini: isinya baru saja diketik
+    # di formulir di atas, dan ia tetap ikut pada pengajuan untuk peninjau.
 
 
 # ── Jalur pipeline ────────────────────────────────────────────────────────
@@ -3453,6 +3531,87 @@ def _normalise_format(value) -> str:
     return teks.lstrip(".")
 
 
+#: Pengajuan milik sendiri yang sedang dibuka untuk disunting di tempat.
+_MY_EDIT_KEY = "_contrib_my_edit"
+
+#: Rona pil status per keadaan pengajuan: menunggu, disetujui, ditolak.
+_MY_STATUS_STATE = {"pending": "warn", "approved": "ok", "rejected": "bad"}
+
+
+def _render_my_submissions(user: dict) -> None:
+    """Pengajuan pipeline MILIK pengguna ini: statusnya, lalu sunting atau hapus.
+
+    Tanpa daftar ini kontributor tidak punya cara mengetahui nasib kirimannya
+    sesudah menekan Ajukan, termasuk ketika ditolak beserta alasannya.
+
+    Aksinya memakai komponen yang SAMA dengan yang dipakai Research Admin
+    (`_render_revision_upload`, `_render_delete_submission`), dan izinnya
+    ditegakkan di lapis layanan: pengaju hanya menyunting kirimannya yang
+    masih menunggu, dan hanya menghapus yang belum disetujui.
+    """
+    from orchestrator.submission_service import (
+        list_submissions, revision_blocker, withdraw_blocker,
+    )
+
+    items = _safe_read("pengajuan saya", list_submissions, kind=KIND_PIPELINE,
+                       submitted_by=user.get("username"), default=[]) or []
+    if not items:
+        return
+    by_id = {i["id"]: i for i in items}
+    rows = sr.my_submission_rows(items, user.get("username"))
+    terbuka = st.session_state.get(_MY_EDIT_KEY) or \
+        st.session_state.get(_CONFIRM_DEL_SUB_KEY)
+    perlu_dilihat = any(r["status"] != "approved" for r in rows)
+
+    with st.expander(t("ap.sec_my_submissions", count=len(rows)),
+                     expanded=bool(terbuka in by_id or perlu_dilihat)):
+        for row in rows:
+            item = by_id.get(row["id"]) or {}
+            sid = row["id"]
+            with st.container(border=True):
+                sel = st.columns([6, 2, 2, 2], vertical_alignment="center")
+                sel[0].markdown(
+                    f"**{escape(row['name'] or '-')}**"
+                    f'<span class="ids-row-sub">'
+                    f"{escape(t('ap.my_submitted', number=sid, when=human_datetime(row['submitted_at'])))}"
+                    "</span>", unsafe_allow_html=True)
+                sel[1].markdown(grid.state_badge(
+                    sr.status_label(row["status"]),
+                    _MY_STATUS_STATE.get(row["status"], "warn")),
+                    unsafe_allow_html=True)
+
+                sunting = revision_blocker(item)
+                if sel[2].button(t("ap.btn_edit_submission"), key=f"my_edit_{sid}",
+                                 use_container_width=True, disabled=bool(sunting),
+                                 help=t(sunting) if sunting else None):
+                    st.session_state[_MY_EDIT_KEY] = sid
+                    st.session_state[_REVISE_OPEN_KEY] = sid
+                    st.session_state.pop(_CONFIRM_DEL_SUB_KEY, None)
+                    st.rerun()
+                hapus = withdraw_blocker(item, user)
+                if sel[3].button(t("ap.btn_withdraw"), key=f"my_del_{sid}",
+                                 use_container_width=True, disabled=bool(hapus),
+                                 help=t(hapus) if hapus else None):
+                    st.session_state[_CONFIRM_DEL_SUB_KEY] = sid
+                    st.session_state.pop(_MY_EDIT_KEY, None)
+                    st.rerun()
+
+                # Alasan penolakan adalah satu-satunya hal yang dapat
+                # ditindaklanjuti pengaju, jadi ia tampil, tidak disembunyikan.
+                if row["status"] == "rejected" and row["note"]:
+                    st.caption(t("ap.my_reject_reason", note=row["note"]))
+
+                if st.session_state.get(_MY_EDIT_KEY) == sid:
+                    if sunting or st.session_state.get(_REVISE_OPEN_KEY) != sid:
+                        # Revisi sudah disimpan atau dibatalkan (formulirnya
+                        # melepas kuncinya sendiri): tutup di sini juga.
+                        st.session_state.pop(_MY_EDIT_KEY, None)
+                    else:
+                        _render_revision_upload(item, user)
+                if st.session_state.get(_CONFIRM_DEL_SUB_KEY) == sid and not hapus:
+                    _render_delete_submission(item, user)
+
+
 def _render_pipeline_flow() -> None:
     # Jangkar kerapatan: seluruh ruas di bawahnya memakai jarak formulir,
     # bukan jarak lapang yang berlaku di halaman lain. Lingkupnya berhenti
@@ -3472,14 +3631,23 @@ def _render_pipeline_flow() -> None:
     # tetapi kontrol unggahnya dimatikan bila belum berhak — supaya tidak ada
     # tombol yang tampak aktif padahal aksinya pasti ditolak lapis aksi.
     may_upload = _render_upload_gate("pipeline")
+    if may_upload:
+        # Kiriman sebelumnya di ATAS formulir: pengguna yang kembali ke halaman
+        # ini paling sering ingin tahu nasib kirimannya, bukan mengirim lagi.
+        _render_my_submissions(current_user() or {})
 
     uploaded = st.file_uploader(
-        t("ap.lbl_pipeline_files"), type=["py"], accept_multiple_files=True,
+        t("ap.lbl_pipeline_files"), type=["py", "ipynb"], accept_multiple_files=True,
         key="contrib_pipeline_files", disabled=not may_upload,
-        help="Boleh lebih dari satu berkas `.py`. Tepat satu di antaranya "
-             "menjadi entry point.",
+        help="Boleh lebih dari satu berkas `.py` atau `.ipynb`. Notebook diubah "
+             "menjadi `.py` dari sel kodenya, tanpa dijalankan. Setiap berkas "
+             "yang memuat kelas turunan `BasePipeline` menjadi entry point.",
     )
-    uploaded = uploaded or []
+    # Notebook diubah menjadi `.py` DI SINI, sekali, sebelum apa pun membacanya:
+    # semua yang di bawah memperlakukannya persis seperti berkas `.py`.
+    uploaded, nb_errors = normalize_pipeline_uploads(uploaded or [])
+    for pesan in nb_errors:
+        st.error(pesan)
     descriptions: dict[str, str] = {}
     if uploaded:
         st.markdown("Berkas terunggah")
@@ -3490,7 +3658,12 @@ def _render_pipeline_flow() -> None:
                 size = len(f.getvalue())
             except Exception:  # pragma: no cover - defensive
                 size = 0
-            cols[0].markdown(f"`{f.name}` · {format_size(size)}")
+            asal = getattr(f, "original_name", None)
+            cols[0].markdown(f"`{f.name}` · {format_size(size)}"
+                             + (f"  \ndari `{asal}` · {f.code_cells} sel kode"
+                                if asal else ""))
+            for catatan_nb in getattr(f, "notes", None) or []:
+                box.warning(catatan_nb)
             descriptions[f.name] = cols[1].text_input(
                 t("ap.lbl_file_role"), key=f"contrib_desc_{f.name}",
                 placeholder="mis. entry point / helper preprocessing",

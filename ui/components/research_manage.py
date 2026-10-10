@@ -492,7 +492,7 @@ def _render_head() -> None:
     """Kepala tabel, memakai jangkar baris yang sama dengan tabel lain."""
     # Di layar sempit tabel ini tampil sebagai kartu (`.ids-mcard` di theme.py)
     # dan judul kolomnya disembunyikan; jumlah algoritma karena itu membawa
-    # labelnya sendiri. Status tidak perlu: "🟢 Aktif" sudah terbaca sendiri.
+    # labelnya sendiri. Status tidak perlu: pil "Aktif" sudah terbaca sendiri.
     from ui.components.sections import mobile_card_labels
     mobile_card_labels("ids-rs-row", {2: t("rs.col_algorithms")})
     with st.container():
@@ -526,8 +526,12 @@ def _render_row(row: dict, user: dict | None) -> None:
             + (f'<span class="ids-row-sub">{escape(sub)}</span>' if sub else ""),
             unsafe_allow_html=True)
         sel[1].markdown(str(row.get("algorithms", 0)))
-        titik = "🟢" if row.get("active") else "⚪"
-        sel[2].markdown(f"{titik} {status_label(row)}")
+        # Pil berlatar, bukan emoji bulat: warna emoji berbeda di tiap sistem
+        # operasi, sedangkan pil ini sama dengan pil keadaan di tabel lain.
+        from ui.components.grid import state_badge
+        sel[2].markdown(state_badge(status_label(row),
+                                    "ok" if row.get("active") else "off"),
+                        unsafe_allow_html=True)
 
         # Tiga slot tetap, walau slot ketiga sering kosong: lebar tombol yang
         # berubah-ubah antar baris membuat kolom Aksi tidak lagi sejajar.
